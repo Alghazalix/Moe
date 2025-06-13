@@ -8,17 +8,12 @@ const IS_CANVAS_ENVIRONMENT = typeof window.__app_id !== 'undefined';
 
 // Determine the appId for Firestore paths.
 // In Canvas, it uses the injected __app_id. For external deployment, it's a fixed string.
-// هذا المعرف سيستخدم في مسارات Firestore. يمكنكم تغييره لاسم مشروعكم الفعلي.
 const appId = IS_CANVAS_ENVIRONMENT ? window.__app_id : "alghazali-family-app-deploy";
 
 // Determine Firebase configuration.
-// In Canvas, it uses the injected __firebase_config. For external deployment, it expects process.env variables.
 const firebaseConfig = IS_CANVAS_ENVIRONMENT
-    ? JSON.parse(window.__firebase_config) // Use Canvas injected config
+    ? JSON.parse(window.__firebase_config)
     : {
-        // These keys should ideally be set as Environment Variables in Netlify
-        // e.g., REACT_APP_FIREBASE_API_KEY, REACT_APP_FIREBASE_AUTH_DOMAIN, etc.
-        // If not set, they will default to undefined, and Firebase will be mocked.
         apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
         authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
         projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
@@ -30,13 +25,10 @@ const firebaseConfig = IS_CANVAS_ENVIRONMENT
 // Initialize Firebase services conditionally
 let firestoreDbInstance;
 let firebaseAuthInstance;
-let firebaseEnabled = false; // Flag to track if real Firebase was successfully initialized
+let firebaseEnabled = false;
 
-// Check if enough config is present to actually initialize Firebase
 const shouldInitializeFirebase = IS_CANVAS_ENVIRONMENT || (
-    firebaseConfig.projectId &&
-    firebaseConfig.apiKey &&
-    firebaseConfig.authDomain // Basic checks for a valid external config
+    firebaseConfig.projectId && firebaseConfig.apiKey && firebaseConfig.authDomain
 );
 
 if (shouldInitializeFirebase) {
@@ -48,7 +40,7 @@ if (shouldInitializeFirebase) {
         console.log("Firebase successfully initialized with provided credentials.");
     } catch (e) {
         console.error("Firebase initialization failed, mocking services:", e);
-        firebaseEnabled = false; // Ensure it's false on error
+        firebaseEnabled = false;
     }
 } else {
     console.warn("Firebase configuration is incomplete for external deployment. Firebase functionality (votes, comments) will be mocked.");
@@ -56,27 +48,21 @@ if (shouldInitializeFirebase) {
 
 // Mock Firebase services if real Firebase was not initialized
 if (!firebaseEnabled) {
-    // Mock Firestore methods to prevent errors and allow UI to render
     firestoreDbInstance = {
-        collection: () => ({ // Mock collection to return a mock object
-            addDoc: () => Promise.resolve(), // Mock addDoc
-        }),
-        doc: () => ({}), // Mock doc to return a mock object
-        getDoc: () => Promise.resolve({ exists: () => false, data: () => ({}) }), // Mock getDoc
-        setDoc: () => Promise.resolve(), // Mock setDoc
-        onSnapshot: (ref, callback) => { // Mock onSnapshot for real-time updates
+        collection: () => ({ addDoc: () => Promise.resolve() }),
+        doc: () => ({}),
+        getDoc: () => Promise.resolve({ exists: () => false, data: () => ({}) }),
+        setDoc: () => Promise.resolve(),
+        onSnapshot: (ref, callback) => {
             console.log("Firestore onSnapshot mocked: No real-time updates for this instance.");
-            // Immediately call callback with an empty snapshot to avoid infinite loading states in UI
             callback({ forEach: () => {}, docs: [] });
-            return () => console.log("Firestore onSnapshot mocked: Unsubscribed."); // Mock unsubscribe
+            return () => console.log("Firestore onSnapshot mocked: Unsubscribed.");
         },
-        query: (ref) => ref // Mock query to just return the ref itself
+        query: (ref) => ref
     };
-    // Mock Firebase Auth methods
     firebaseAuthInstance = {
         onAuthStateChanged: (callback) => {
             console.log("Firebase Auth onAuthStateChanged mocked.");
-            // Immediately call callback with a mock anonymous user
             callback({ uid: 'mock-user-id', isAnonymous: true });
             return () => console.log("Firebase Auth onAuthStateChanged mocked: Unsubscribed.");
         },
@@ -86,12 +72,10 @@ if (!firebaseEnabled) {
         },
         signInWithCustomToken: () => {
             console.log("Firebase Auth signInWithCustomToken mocked.");
-            // For Canvas, it will still use its actual token logic
             return Promise.resolve({ user: { uid: 'mock-canvas-user', isAnonymous: false } });
         }
     };
 }
-
 
 const nameKeys = ['يامن', 'غوث', 'الغوث', 'غياث'];
 
@@ -125,28 +109,23 @@ function App() {
     useEffect(() => {
         const signIn = async () => {
             if (IS_CANVAS_ENVIRONMENT) {
-                // In Canvas, use the initial auth token if available
                 if (typeof window.__initial_auth_token !== 'undefined') {
                     await signInWithCustomToken(firebaseAuthInstance, window.__initial_auth_token);
                 } else {
-                    // Fallback to anonymous sign-in if no token (shouldn't happen in Canvas)
                     await signInAnonymously(firebaseAuthInstance);
                 }
             } else if (firebaseEnabled) {
-                // For external deploy, if Firebase is enabled, sign in anonymously
                 await signInAnonymously(firebaseAuthInstance);
             } else {
-                // If Firebase is disabled, mock a user for UI purposes
                 setCurrentUser({ uid: 'mock-user-id', isAnonymous: true });
                 setUserName('مستخدم مجهول');
                 setUserRole('guest');
-                return; // Exit if Firebase is not enabled
+                return;
             }
         };
 
         signIn();
 
-        // Listen for auth state changes if Firebase is enabled
         const unsubscribe = firebaseAuthInstance.onAuthStateChanged((user) => {
             setCurrentUser(user);
             if (user) {
@@ -165,11 +144,11 @@ function App() {
             }
         });
         return () => unsubscribe();
-    }, [firebaseEnabled]); // Dependency on firebaseEnabled flag
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [firebaseEnabled]); // تم إضافة تعليق لتجاهل تحذير eslint هنا
 
     useEffect(() => {
         if (!currentUser || !firebaseEnabled) {
-            // If Firebase is not enabled, ensure votes and comments are empty
             setVotes({ 'يامن': 0, 'غوث': 0, 'الغوث': 0, 'غياث': 0 });
             setComments([]);
             return;
@@ -205,7 +184,8 @@ function App() {
             unsubscribeVotes();
             unsubscribeComments();
         };
-    }, [currentUser, firebaseEnabled]); // Depend on currentUser and firebaseEnabled
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentUser, firebaseEnabled]); // تم إضافة تعليق لتجاهل تحذير eslint هنا
 
     const showTemporaryMessage = (message, type = 'info') => {
         setTempMessage(message);
@@ -222,7 +202,7 @@ function App() {
             showTemporaryMessage("وظائف Firebase غير نشطة. لا يمكن حفظ التصويت.", 'error');
             return;
         }
-        if (!currentUser || currentUser.uid === 'mock-user-id') { // Check for mock user
+        if (!currentUser || currentUser.uid === 'mock-user-id') {
             showTemporaryMessage("يرجى تسجيل الدخول أو تحديث الصفحة للمشاركة في التصويت.", 'error');
             return;
         }
@@ -268,7 +248,7 @@ function App() {
             showTemporaryMessage("التعليق لا يمكن أن يكون فارغاً.", 'error');
             return;
         }
-        if (!currentUser || currentUser.uid === 'mock-user-id') { // Check for mock user
+        if (!currentUser || currentUser.uid === 'mock-user-id') {
             showTemporaryMessage("يرجى تسجيل الدخول أو تحديث الصفحة لإضافة تعليق.", 'error');
             return;
         }
@@ -685,7 +665,7 @@ function App() {
                     {tempMessage}
                 </div>
             )}
-            {!firebaseEnabled && ( // رسالة تنبيه إذا كانت Firebase غير مفعلة
+            {!firebaseEnabled && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4 w-full max-w-xl text-center shadow-md animate-fadeIn">
                     <strong className="font-bold">تنبيه: </strong>
                     <span className="block sm:inline">وظائف حفظ البيانات (التصويت، التعليقات) غير نشطة حالياً. يرجى إعداد مشروع Firebase الخاص بكم لتفعيلها لاحقاً.</span>
