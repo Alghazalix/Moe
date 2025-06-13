@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect } from 'react'; // تم إزالة useCallback و useRef
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot } from 'firebase/firestore';
 import { initializeApp } from 'firebase/app';
@@ -99,6 +99,7 @@ function App() {
     useEffect(() => {
         if (!currentUser) return;
 
+        // لا حاجة لـ appId و db في قائمة التبعيات لأنها ثابتة بعد التهيئة
         const votesCollectionRef = collection(db, `artifacts/${appId}/public/data/nameVotes`);
         const unsubscribeVotes = onSnapshot(votesCollectionRef, (snapshot) => {
             const currentVotes = { 'يامن': 0, 'غوث': 0, 'الغوث': 0, 'غياث': 0 };
@@ -127,7 +128,7 @@ function App() {
             unsubscribeVotes();
             unsubscribeComments();
         };
-    }, [currentUser, appId, db]);
+    }, [currentUser]); // تم تعديل قائمة التبعيات هنا، فقط currentUser
 
     // Temporary message display
     const showTemporaryMessage = (message, type = 'info') => {
@@ -269,7 +270,7 @@ function App() {
         setLoadingBlessing(false);
     };
 
-    const handleGenerateSimilarNames = async (name, meaning) => {
+    const handleGenerateSimilarNames = async (name, meaning) => { // هذه الدالة الآن مستخدمة
         setLoadingSuggestions(prev => ({ ...prev, [name]: true }));
         setSuggestedNamesForCard(prev => ({ ...prev, [name]: '' }));
         const prompt = `اقترح 3 أسماء عربية (أولاد) أخرى ذات دلالات إيجابية مشابهة لاسم "${name}" الذي يعني "${meaning}"، مع ذكر معنى كل اسم بشكل موجز، بصيغة قائمة مرقمة (مثال: 1. اسم: معناه). لا تكتب أي مقدمة أو خاتمة، فقط القائمة.`;
@@ -345,7 +346,7 @@ function App() {
             otherMeaning: 'لا يوجد.',
             uniqueness: 'فريد بمعنى أنه غير مستخدم كاسم شخصي على الإطلاق.',
             acceptance: 'غير مقبول كاسم شخصي في الثقافة الإسلامية والعربية بشكل عام، ويُعد من الأسماء التي يُنهى عن التسمية بها.',
-            alternativeInterpretation: 'هناك اختلاف في تأويل استخدام هذا الاسم؛ فبعض الفقهاء يرى جواز استخدامه إذا كان بمعنى طلب العون، ولكن الأغلبية الساحقة من علماء السلف والخلف يرون أن "الغوث" بأل التعريف اسم من أسماء الله الحسنى أو صفة من صفاته الخاصة، ولا يجوز تسمية الإنسان بها إلا إذا سبقت بـ "عبد"، مثل "عبد الغوث" (عبد المغيث).',
+            alternativeInterpretation: 'لا يوجد اختلاف جوهري في تفسير هذا الاسم، فدلالاته على الإغاثة والعون واضحة ومباشرة.',
             score: 2.0
         },
         'غياث': {
@@ -413,10 +414,10 @@ function App() {
                     </div>
                     {/* Interactive activity for Name Analysis */}
                     <div className="mt-8 pt-6 border-t-2 border-indigo-200">
-                        <h4 className="text-2xl font-bold text-purple-700 mb-4">نشاط تفاعلي: معلومة شيقة عن {name}</h4>
+                        <h4 className="text-2xl font-bold text-purple-700 mb-4">نشاطات إضافية حول الاسم:</h4>
                         <button
                             onClick={(e) => { e.stopPropagation(); handleGenerateFunFact(name); }}
-                            className="w-full bg-gradient-to-r from-teal-500 to-green-600 hover:from-teal-600 hover:to-green-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-teal-300 flex items-center justify-center space-x-2"
+                            className="w-full bg-gradient-to-r from-teal-500 to-green-600 hover:from-teal-600 hover:to-green-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-teal-300 flex items-center justify-center space-x-2 mb-4"
                         >
                             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5L6 11H5a1 1 0 000 2h1a1 1 0 00.867.5L10 9l3.133 4.5A1 1 0 0014 13h1a1 1 0 000-2h-1l-3.133-4.5A1 1 0 0010 7z" clipRule="evenodd"></path></svg>
                             <span>احصل على معلومة شيقة</span>
@@ -424,6 +425,32 @@ function App() {
                         {funFact && (
                             <div className="mt-4 bg-teal-50 p-4 rounded-lg text-base text-gray-800 border border-teal-200 animate-fadeIn">
                                 <p className="whitespace-pre-wrap">💡 {funFact}</p>
+                            </div>
+                        )}
+
+                        <button
+                            onClick={(e) => { e.stopPropagation(); handleGenerateSimilarNames(name, details.meaning); }} // تم تفعيل هذه الميزة
+                            className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-pink-300 flex items-center justify-center space-x-2 mt-4"
+                            disabled={loadingSuggestions[name]} // تم تفعيل حالة التحميل
+                        >
+                            {loadingSuggestions[name] ? (
+                                <>
+                                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span>جاري التوليد...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span>✨ اقتراح أسماء مشابهة</span>
+                                </>
+                            )}
+                        </button>
+                        {suggestedNamesForCard[name] && ( // تم تفعيل عرض الاقتراحات
+                            <div className="mt-4 bg-purple-50 p-4 rounded-lg text-base text-gray-800 border border-purple-200 animate-fadeIn">
+                                <h4 className="font-semibold text-purple-700 mb-2 border-b border-purple-300 pb-1">أسماء مقترحة:</h4>
+                                <p className="whitespace-pre-wrap">{suggestedNamesForCard[name]}</p>
                             </div>
                         )}
                     </div>
@@ -942,7 +969,6 @@ function App() {
                                             <tr className="bg-white hover:bg-teal-50">
                                                 <td className="py-3 px-4 border-b border-gray-200 font-semibold text-teal-700">غياث</td>
                                                 <td className="py-3 px-4 border-b border-gray-200 text-gray-700">قوة المعنى (إغاثة سخية)، مقبول وشائع، توافق جيد مع اللقب.</td>
-                                                <td className="py-3 px-4 border-b border-gray-200 text-gray-700">أقل شهرة من "يامن".</td>
                                                 <td className="py-3 px-4 border-b border-gray-200 text-center text-xl font-bold text-purple-600">جيد جداً (9.0)</td>
                                             </tr>
                                         </tbody>
