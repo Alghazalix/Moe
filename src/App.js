@@ -3,55 +3,93 @@ import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged }
 import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot } from 'firebase/firestore';
 import { initializeApp } from 'firebase/app';
 
-// For Firestore paths. This needs to be a constant for the app's data structure.
-// When deploying to Netlify, this acts as the "application ID" for data segregation.
-// يرجى ملاحظة: هذا المعرف يستخدم في مسارات Firestore. يمكنكم تغييره لاسم مشروعكم الفعلي.
-const APP_ID_FOR_FIRESTORE = "alghazali-family-app";
+// Define if the app is running in the Canvas environment (where __app_id, etc., are injected)
+const IS_CANVAS_ENVIRONMENT = typeof window.__app_id !== 'undefined';
 
-// Initialize Firebase config from environment variables (for Netlify) or provide placeholders.
-// في بيئة الكانفاس، سيتم استخدام المتغيرات المحقونة (window.__...)
-// في Netlify، ستحتاجون لتعريف هذه المتغيرات في إعدادات البيئة الخاصة بموقعكم.
-const firebaseConfig = typeof window.__firebase_config !== 'undefined'
-    ? JSON.parse(window.__firebase_config)
+// Determine the appId for Firestore paths.
+// In Canvas, it uses the injected __app_id. For external deployment, it's a fixed string.
+// هذا المعرف سيستخدم في مسارات Firestore. يمكنكم تغييره لاسم مشروعكم الفعلي.
+const appId = IS_CANVAS_ENVIRONMENT ? window.__app_id : "alghazali-family-app-deploy";
+
+// Determine Firebase configuration.
+// In Canvas, it uses the injected __firebase_config. For external deployment, it expects process.env variables.
+const firebaseConfig = IS_CANVAS_ENVIRONMENT
+    ? JSON.parse(window.__firebase_config) // Use Canvas injected config
     : {
-        apiKey: process.env.REACT_APP_FIREBASE_API_KEY || "YOUR_FIREBASE_API_KEY", // استبدلوا هذه القيم بقيمكم الحقيقية من مشروع Firebase
-        authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN || "YOUR_FIREBASE_AUTH_DOMAIN",
-        projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID || "YOUR_FIREBASE_PROJECT_ID",
-        storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET || "YOUR_FIREBASE_STORAGE_BUCKET",
-        messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID || "YOUR_FIREBASE_MESSAGING_SENDER_ID",
-        appId: process.env.REACT_APP_FIREBASE_APP_ID || "YOUR_FIREBASE_APP_ID"
+        // These keys should ideally be set as Environment Variables in Netlify
+        // e.g., REACT_APP_FIREBASE_API_KEY, REACT_APP_FIREBASE_AUTH_DOMAIN, etc.
+        // If not set, they will default to undefined, and Firebase will be mocked.
+        apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+        authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+        projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+        storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+        messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+        appId: process.env.REACT_APP_FIREBASE_APP_ID
     };
 
-// Initialize Firebase services
-let appInstance;
-let firestoreDb; // استخدام اسم مختلف لتجنب التعارض
-let firebaseAuth; // استخدام اسم مختلف لتجنب التعارض
-let firebaseEnabled = false; // لتتبع ما إذا كانت Firebase مفعلة
+// Initialize Firebase services conditionally
+let firestoreDbInstance;
+let firebaseAuthInstance;
+let firebaseEnabled = false; // Flag to track if real Firebase was successfully initialized
 
-// Check if any Firebase config is provided (i.e., not all placeholders for external deploy)
-// في بيئة الكانفاس، هذه المتغيرات دائماً معرفة. في Netlify، إذا لم يتم إعدادها، ستكون قيمها هي القيم الافتراضية "YOUR_..."
-const hasFirebaseConfig = firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_FIREBASE_API_KEY";
+// Check if enough config is present to actually initialize Firebase
+const shouldInitializeFirebase = IS_CANVAS_ENVIRONMENT || (
+    firebaseConfig.projectId &&
+    firebaseConfig.apiKey &&
+    firebaseConfig.authDomain // Basic checks for a valid external config
+);
 
-if (hasFirebaseConfig) {
+if (shouldInitializeFirebase) {
     try {
-        appInstance = initializeApp(firebaseConfig);
-        firestoreDb = getFirestore(appInstance);
-        firebaseAuth = getAuth(appInstance);
+        const app = initializeApp(firebaseConfig);
+        firestoreDbInstance = getFirestore(app);
+        firebaseAuthInstance = getAuth(app);
         firebaseEnabled = true;
-        console.log("Firebase initialized successfully with provided credentials.");
+        console.log("Firebase successfully initialized with provided credentials.");
     } catch (e) {
-        console.error("Error initializing Firebase:", e);
-        // Fallback to dummy services to prevent app crash if initialization fails
-        firestoreDb = { collection: () => ({}), doc: () => ({}) };
-        firebaseAuth = { onAuthStateChanged: () => () => {}, signInAnonymously: () => Promise.resolve(), signInWithCustomToken: () => Promise.resolve() };
-        firebaseEnabled = false;
+        console.error("Firebase initialization failed, mocking services:", e);
+        firebaseEnabled = false; // Ensure it's false on error
     }
 } else {
-    console.warn("Firebase credentials not provided. Firebase functionality (votes, comments) will be disabled.");
-    // Dummy services if no config is present to prevent crashes
-    firestoreDb = { collection: () => ({}), doc: () => ({}) };
-    firebaseAuth = { onAuthStateChanged: () => () => {}, signInAnonymously: () => Promise.resolve(), signInWithCustomToken: () => Promise.resolve() };
-    firebaseEnabled = false;
+    console.warn("Firebase configuration is incomplete for external deployment. Firebase functionality (votes, comments) will be mocked.");
+}
+
+// Mock Firebase services if real Firebase was not initialized
+if (!firebaseEnabled) {
+    // Mock Firestore methods to prevent errors and allow UI to render
+    firestoreDbInstance = {
+        collection: () => ({ // Mock collection to return a mock object
+            addDoc: () => Promise.resolve(), // Mock addDoc
+        }),
+        doc: () => ({}), // Mock doc to return a mock object
+        getDoc: () => Promise.resolve({ exists: () => false, data: () => ({}) }), // Mock getDoc
+        setDoc: () => Promise.resolve(), // Mock setDoc
+        onSnapshot: (ref, callback) => { // Mock onSnapshot for real-time updates
+            console.log("Firestore onSnapshot mocked: No real-time updates for this instance.");
+            // Immediately call callback with an empty snapshot to avoid infinite loading states in UI
+            callback({ forEach: () => {}, docs: [] });
+            return () => console.log("Firestore onSnapshot mocked: Unsubscribed."); // Mock unsubscribe
+        },
+        query: (ref) => ref // Mock query to just return the ref itself
+    };
+    // Mock Firebase Auth methods
+    firebaseAuthInstance = {
+        onAuthStateChanged: (callback) => {
+            console.log("Firebase Auth onAuthStateChanged mocked.");
+            // Immediately call callback with a mock anonymous user
+            callback({ uid: 'mock-user-id', isAnonymous: true });
+            return () => console.log("Firebase Auth onAuthStateChanged mocked: Unsubscribed.");
+        },
+        signInAnonymously: () => {
+            console.log("Firebase Auth signInAnonymously mocked.");
+            return Promise.resolve({ user: { uid: 'mock-user-id', isAnonymous: true } });
+        },
+        signInWithCustomToken: () => {
+            console.log("Firebase Auth signInWithCustomToken mocked.");
+            // For Canvas, it will still use its actual token logic
+            return Promise.resolve({ user: { uid: 'mock-canvas-user', isAnonymous: false } });
+        }
+    };
 }
 
 
@@ -85,28 +123,31 @@ function App() {
 
     // Firebase Authentication & Listeners
     useEffect(() => {
-        if (!firebaseEnabled) {
-            console.warn("Firebase not enabled. Authentication and data persistence will not work.");
-            setCurrentUser({ uid: 'disabled-user', isAnonymous: true }); // Mock user for UI
-            return;
-        }
-
         const signIn = async () => {
-            try {
-                // استخدام window.__initial_auth_token لبيئة الكانفاس، أو تسجيل دخول مجهول لـ Netlify
+            if (IS_CANVAS_ENVIRONMENT) {
+                // In Canvas, use the initial auth token if available
                 if (typeof window.__initial_auth_token !== 'undefined') {
-                    await signInWithCustomToken(firebaseAuth, window.__initial_auth_token);
+                    await signInWithCustomToken(firebaseAuthInstance, window.__initial_auth_token);
                 } else {
-                    await signInAnonymously(firebaseAuth);
+                    // Fallback to anonymous sign-in if no token (shouldn't happen in Canvas)
+                    await signInAnonymously(firebaseAuthInstance);
                 }
-                console.log("Firebase authenticated successfully.");
-            } catch (error) {
-                console.error("Firebase authentication error:", error);
+            } else if (firebaseEnabled) {
+                // For external deploy, if Firebase is enabled, sign in anonymously
+                await signInAnonymously(firebaseAuthInstance);
+            } else {
+                // If Firebase is disabled, mock a user for UI purposes
+                setCurrentUser({ uid: 'mock-user-id', isAnonymous: true });
+                setUserName('مستخدم مجهول');
+                setUserRole('guest');
+                return; // Exit if Firebase is not enabled
             }
         };
+
         signIn();
 
-        const unsubscribe = onAuthStateChanged(firebaseAuth, (user) => {
+        // Listen for auth state changes if Firebase is enabled
+        const unsubscribe = firebaseAuthInstance.onAuthStateChanged((user) => {
             setCurrentUser(user);
             if (user) {
                 const storedRole = localStorage.getItem('userRole');
@@ -124,12 +165,17 @@ function App() {
             }
         });
         return () => unsubscribe();
-    }, [firebaseEnabled]); // يعتمد على firebaseEnabled
+    }, [firebaseEnabled]); // Dependency on firebaseEnabled flag
 
     useEffect(() => {
-        if (!currentUser || !firebaseEnabled) return;
+        if (!currentUser || !firebaseEnabled) {
+            // If Firebase is not enabled, ensure votes and comments are empty
+            setVotes({ 'يامن': 0, 'غوث': 0, 'الغوث': 0, 'غياث': 0 });
+            setComments([]);
+            return;
+        }
 
-        const votesCollectionRef = collection(firestoreDb, `artifacts/${APP_ID_FOR_FIRESTORE}/public/data/nameVotes`);
+        const votesCollectionRef = collection(firestoreDbInstance, `artifacts/${appId}/public/data/nameVotes`);
         const unsubscribeVotes = onSnapshot(votesCollectionRef, (snapshot) => {
             const currentVotes = { 'يامن': 0, 'غوث': 0, 'الغوث': 0, 'غياث': 0 };
             snapshot.forEach((doc) => {
@@ -141,9 +187,10 @@ function App() {
             setVotes(currentVotes);
         }, (error) => {
             console.error("Error fetching votes:", error);
+            showTemporaryMessage("تعذر جلب الأصوات من Firebase. قد تكون هناك مشكلة في الإعدادات.", 'error');
         });
 
-        const commentsCollectionRef = collection(firestoreDb, `artifacts/${APP_ID_FOR_FIRESTORE}/public/data/nameComments`);
+        const commentsCollectionRef = collection(firestoreDbInstance, `artifacts/${appId}/public/data/nameComments`);
         const q = query(commentsCollectionRef);
         const unsubscribeComments = onSnapshot(q, (snapshot) => {
             const fetchedComments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -151,13 +198,14 @@ function App() {
             setComments(fetchedComments);
         }, (error) => {
             console.error("Error fetching comments:", error);
+            showTemporaryMessage("تعذر جلب التعليقات من Firebase. قد تكون هناك مشكلة في الإعدادات.", 'error');
         });
 
         return () => {
             unsubscribeVotes();
             unsubscribeComments();
         };
-    }, [currentUser, firebaseEnabled]); // تم تعديل قائمة التبعيات
+    }, [currentUser, firebaseEnabled]); // Depend on currentUser and firebaseEnabled
 
     const showTemporaryMessage = (message, type = 'info') => {
         setTempMessage(message);
@@ -174,7 +222,7 @@ function App() {
             showTemporaryMessage("وظائف Firebase غير نشطة. لا يمكن حفظ التصويت.", 'error');
             return;
         }
-        if (!currentUser) {
+        if (!currentUser || currentUser.uid === 'mock-user-id') { // Check for mock user
             showTemporaryMessage("يرجى تسجيل الدخول أو تحديث الصفحة للمشاركة في التصويت.", 'error');
             return;
         }
@@ -186,7 +234,7 @@ function App() {
         const currentUserId = currentUser.uid;
 
         try {
-            const userVoteControlDocRef = doc(firestoreDb, `artifacts/${APP_ID_FOR_FIRESTORE}/users/${currentUserId}/myVoteControl`, name);
+            const userVoteControlDocRef = doc(firestoreDbInstance, `artifacts/${appId}/users/${currentUserId}/myVoteControl`, name);
             const userVoteControlSnap = await getDoc(userVoteControlDocRef);
 
             if (userVoteControlSnap.exists()) {
@@ -194,7 +242,7 @@ function App() {
                 return;
             }
 
-            const publicVoteDocRef = doc(firestoreDb, `artifacts/${APP_ID_FOR_FIRESTORE}/public/data/nameVotes`, `${name}_${currentUserId}_${Date.now()}`);
+            const publicVoteDocRef = doc(firestoreDbInstance, `artifacts/${appId}/public/data/nameVotes`, `${name}_${currentUserId}_${Date.now()}`);
             await setDoc(publicVoteDocRef, {
                 name: name,
                 userId: currentUserId,
@@ -220,7 +268,7 @@ function App() {
             showTemporaryMessage("التعليق لا يمكن أن يكون فارغاً.", 'error');
             return;
         }
-        if (!currentUser) {
+        if (!currentUser || currentUser.uid === 'mock-user-id') { // Check for mock user
             showTemporaryMessage("يرجى تسجيل الدخول أو تحديث الصفحة لإضافة تعليق.", 'error');
             return;
         }
@@ -232,7 +280,7 @@ function App() {
         const currentUserId = currentUser.uid;
 
         try {
-            const commentsCollectionRef = collection(firestoreDb, `artifacts/${APP_ID_FOR_FIRESTORE}/public/data/nameComments`);
+            const commentsCollectionRef = collection(firestoreDbInstance, `artifacts/${appId}/public/data/nameComments`);
             await setDoc(doc(commentsCollectionRef, `${currentUserId}_${Date.now()}`), {
                 userId: currentUserId,
                 userName: userName,
@@ -410,20 +458,17 @@ function App() {
         "التحليل الصوتي (تقريبي)", "بدائل تفسيرية"
     ];
 
-    // Main name card component for the analysis section
-    // Updated AnalysisCard for the new expanded/collapsed view
     const AnalysisCard = ({ name, details, isExpanded, onExpand }) => (
         <div
             className={`bg-white rounded-xl shadow-xl p-6 transform transition-all duration-500 ease-in-out
             ${isExpanded ? 'col-span-full ring-4 ring-indigo-500 z-20 md:p-8 lg:p-10' : 'hover:scale-105 hover:shadow-2xl relative cursor-pointer flex flex-col justify-between items-center text-center p-4'}
             `}
-            onClick={() => onExpand(isExpanded ? null : name)} // Toggle expand/collapse
+            onClick={() => onExpand(isExpanded ? null : name)}
         >
             <h3 className={`font-extrabold text-indigo-800 mb-4 ${isExpanded ? 'text-4xl sm:text-5xl border-b-4 border-indigo-400 pb-3' : 'text-2xl sm:text-3xl'}`}>
                 {name}
             </h3>
             {!isExpanded ? (
-                // Compact view
                 <>
                     <p className="text-gray-600 text-sm sm:text-base mb-4 flex-grow">{details.meaning}</p>
                     <button className="bg-blue-500 text-white px-4 py-2 rounded-full text-sm sm:text-base hover:bg-blue-600 transition-colors shadow-md">
@@ -431,7 +476,6 @@ function App() {
                     </button>
                 </>
             ) : (
-                // Expanded view
                 <>
                     <div className="space-y-4 mb-8">
                         {axes.map((axis, index) => (
@@ -445,7 +489,6 @@ function App() {
                             </div>
                         ))}
                     </div>
-                    {/* Interactive activity for Name Analysis */}
                     <div className="mt-8 pt-6 border-t-2 border-indigo-200">
                         <h4 className="text-2xl font-bold text-purple-700 mb-4">نشاطات إضافية حول الاسم:</h4>
                         <button
@@ -645,7 +688,7 @@ function App() {
             {!firebaseEnabled && ( // رسالة تنبيه إذا كانت Firebase غير مفعلة
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4 w-full max-w-xl text-center shadow-md animate-fadeIn">
                     <strong className="font-bold">تنبيه: </strong>
-                    <span className="block sm:inline">وظائف حفظ البيانات (التصويت، التعليقات) غير نشطة حالياً. يرجى إعداد مشروع Firebase الخاص بكم لتفعيلها.</span>
+                    <span className="block sm:inline">وظائف حفظ البيانات (التصويت، التعليقات) غير نشطة حالياً. يرجى إعداد مشروع Firebase الخاص بكم لتفعيلها لاحقاً.</span>
                 </div>
             )}
             <div className="w-full max-w-6xl bg-white rounded-xl shadow-2xl overflow-hidden mb-8 transform transition-all duration-300">
@@ -740,7 +783,6 @@ function App() {
                                 ))}
                             </div>
 
-                            {/* Comparison Activity: Name Vibe Poll */}
                             <div className="bg-white rounded-xl shadow-lg p-6 border border-teal-200 mt-8">
                                 <h3 className="text-2xl font-bold text-teal-700 mb-4 border-b pb-2">
                                     نشاط: أي اسم يوحي بأي مشاعر؟
@@ -778,18 +820,17 @@ function App() {
                             <h2 className="text-3xl font-bold text-center text-indigo-700 mb-8 border-b-2 border-indigo-400 pb-4">
                                 تصويت الوالدين وآراؤهم
                             </h2>
-                            {currentUser && firebaseEnabled && ( // شرط عرض معرف المستخدم إذا كانت Firebase مفعلة
+                            {currentUser && firebaseEnabled && (
                                 <p className="text-center text-gray-600 mb-4">
                                     معرف المستخدم الخاص بك: <span className="font-mono text-sm bg-gray-200 p-1 rounded">{currentUser.uid.substring(0, 8)}...</span>
                                 </p>
                             )}
-                             {!firebaseEnabled && ( // رسالة تنبيه إذا كانت Firebase غير مفعلة هنا أيضاً
+                             {!firebaseEnabled && (
                                 <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded-lg relative mb-4 w-full text-center shadow-md">
                                     <span className="block sm:inline">وظائف التصويت والتعليق غير نشطة. يرجى إعداد Firebase لتفعيلها.</span>
                                 </div>
                             )}
 
-                            {/* Parent Identification */}
                             <div className="bg-white rounded-xl shadow-lg p-6 border border-teal-300 mb-8 text-center">
                                 <h3 className="text-2xl font-bold text-teal-700 mb-4">من يصوّت؟</h3>
                                 <div className="flex flex-wrap justify-center gap-4 mb-4">
@@ -801,7 +842,7 @@ function App() {
                                             checked={userRole === 'father'}
                                             onChange={() => handleUserRoleChange('father')}
                                             className="form-radio h-5 w-5 text-blue-600"
-                                            disabled={!firebaseEnabled} // تعطيل إذا كانت Firebase غير مفعلة
+                                            disabled={!firebaseEnabled}
                                         />
                                         <span className="text-lg font-semibold text-blue-800">👨‍🦰 الأب (محمد)</span>
                                     </label>
@@ -813,7 +854,7 @@ function App() {
                                             checked={userRole === 'mother'}
                                             onChange={() => handleUserRoleChange('mother')}
                                             className="form-radio h-5 w-5 text-pink-600"
-                                            disabled={!firebaseEnabled} // تعطيل إذا كانت Firebase غير مفعلة
+                                            disabled={!firebaseEnabled}
                                         />
                                         <span className="text-lg font-semibold text-pink-800">👩‍🦰 الأم (خلود)</span>
                                     </label>
@@ -825,7 +866,7 @@ function App() {
                                             checked={userRole === 'guest'}
                                             onChange={() => handleUserRoleChange('guest')}
                                             className="form-radio h-5 w-5 text-gray-600"
-                                            disabled={!firebaseEnabled} // تعطيل إذا كانت Firebase غير مفعلة
+                                            disabled={!firebaseEnabled}
                                         />
                                         <span className="text-lg font-semibold text-gray-800">👤 زائر (مجهول)</span>
                                     </label>
@@ -837,7 +878,7 @@ function App() {
                                                 placeholder="أدخل اسمك (اختياري)"
                                                 value={userName === 'مستخدم مجهول' ? '' : userName}
                                                 onChange={(e) => handleUserRoleChange('custom', e.target.value)}
-                                                disabled={!firebaseEnabled} // تعطيل إذا كانت Firebase غير مفعلة
+                                                disabled={!firebaseEnabled}
                                             />
                                         </div>
                                     )}
@@ -858,7 +899,7 @@ function App() {
                                             <button
                                                 onClick={() => handleVote(name)}
                                                 className="w-full bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-green-300 mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                disabled={!firebaseEnabled} // تعطيل إذا كانت Firebase غير مفعلة
+                                                disabled={!firebaseEnabled}
                                             >
                                                 صوّت لهذا الاسم
                                             </button>
@@ -870,7 +911,6 @@ function App() {
                                 ))}
                             </div>
 
-                            {/* Vote Visualization Bar Chart */}
                             <div className="bg-white rounded-xl shadow-lg p-6 border border-teal-200 mt-8">
                                 <h3 className="text-2xl font-bold text-teal-700 mb-4 border-b pb-2">
                                     مخطط الأصوات الحالي
@@ -906,7 +946,6 @@ function App() {
                                 </p>
                             </div>
 
-                            {/* User Comments Section */}
                             <div className="bg-white rounded-xl shadow-lg p-6 border border-purple-200 mt-8">
                                 <h3 className="text-2xl font-bold text-purple-700 mb-4 border-b pb-2">
                                     شاركا آراءكما
@@ -916,12 +955,12 @@ function App() {
                                     placeholder="اكتبي أو اكتبي رأيكما حول الأسماء أو عملية الاختيار..."
                                     value={newComment}
                                     onChange={(e) => setNewComment(e.target.value)}
-                                    disabled={!firebaseEnabled} // تعطيل إذا كانت Firebase غير مفعلة
+                                    disabled={!firebaseEnabled}
                                 ></textarea>
                                 <button
                                     onClick={handleAddComment}
                                     className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-purple-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    disabled={!firebaseEnabled} // تعطيل إذا كانت Firebase غير مفعلة
+                                    disabled={!firebaseEnabled}
                                 >
                                     إضافة رأي
                                 </button>
@@ -946,7 +985,6 @@ function App() {
                                 </div>
                             </div>
 
-                            {/* Additional Activity: Name Story / Future Vision */}
                             <div className="bg-white rounded-xl shadow-lg p-6 border border-blue-200 mt-8">
                                 <h3 className="text-2xl font-bold text-blue-700 mb-4 border-b pb-2">
                                     💭 رؤيتكما لاسم المستقبل:
@@ -959,12 +997,12 @@ function App() {
                                     placeholder="أتخيل أن [الاسم] سيكون..."
                                     value={nameVibeInput}
                                     onChange={(e) => setNameVibeInput(e.target.value)}
-                                    disabled={!firebaseEnabled} // تعطيل إذا كانت Firebase غير مفعلة
+                                    disabled={!firebaseEnabled}
                                 ></textarea>
                                 <button
                                     onClick={() => showTemporaryMessage("شكراً لمشاركتكما رؤيتكما المستقبلية الملهمة!", 'success')}
                                     className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    disabled={!firebaseEnabled} // تعطيل إذا كانت Firebase غير مفعلة
+                                    disabled={!firebaseEnabled}
                                 >
                                     شارك الرؤية
                                 </button>
@@ -1023,13 +1061,11 @@ function App() {
                                     </table>
                                 </div>
 
-                                {/* Detailed Practical Parenting Guides */}
                                 <h3 className="text-2xl font-bold text-teal-700 mb-4 mt-8">دليل تربوي تطبيقي متكامل للاسمين المقترحين:</h3>
                                 <p className="text-gray-700 leading-relaxed mb-4">
                                     لتسهيل رحلتكما الأبوية، نقدم لكما دليلاً عملياً لكيفية تعزيز الصفات الإيجابية المرتبطة بكل من اسمي "يامن" و"غياث". تذكروا أن الاسم هو جزء من الهوية، والتربية هي رحلة مستمرة لغرس القيم.
                                 </p>
 
-                                {/* يامن Parenting Guide */}
                                 <div className="bg-blue-50 p-5 rounded-lg shadow-inner mb-6 border border-blue-200">
                                     <h4 className="text-xl font-bold text-blue-700 mb-3 flex items-center">
                                         <span className="ml-2">🌟</span> إذا وقع اختياركما على اسم <span className="text-indigo-800 mr-1">"يامن"</span>:
@@ -1050,7 +1086,6 @@ function App() {
                                     </p>
                                 </div>
 
-                                {/* غياث Parenting Guide */}
                                 <div className="bg-purple-50 p-5 rounded-lg shadow-inner border border-purple-200">
                                     <h4 className="text-xl font-bold text-purple-700 mb-3 flex items-center">
                                         <span className="ml-2">💪</span> إذا وقع اختياركما على اسم <span className="text-indigo-800 mr-1">"غياث"</span>:
