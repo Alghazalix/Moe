@@ -4,8 +4,9 @@ import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot } from
 import { initializeApp } from 'firebase/app';
 
 // Ensure Firebase config and app ID are available
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+// تم التعديل هنا: استخدام window.__app_id و window.__firebase_config
+const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'default-app-id';
+const firebaseConfig = typeof window.__firebase_config !== 'undefined' ? JSON.parse(window.__firebase_config) : {};
 
 // Initialize Firebase only once
 let appInstance;
@@ -14,9 +15,9 @@ try {
 } catch (e) {
     // Firebase app might already be initialized in some environments
     console.warn("Firebase app already initialized or error initializing:", e);
-    // If already initialized, fetch the existing app instance
-    if (typeof firebase !== 'undefined' && firebase.apps.length) {
-        appInstance = firebase.app(); // Get the default app
+    // تم التعديل هنا: استخدام window.firebase
+    if (typeof window.firebase !== 'undefined' && window.firebase.apps.length) {
+        appInstance = window.firebase.app(); // Get the default app
     } else { // Fallback if firebase global is not immediately available or no apps
         appInstance = initializeApp(firebaseConfig);
     }
@@ -28,8 +29,9 @@ const auth = getAuth(appInstance);
 // Sign in with custom token if available, otherwise anonymously
 const signInFirebase = async () => {
     try {
-        if (typeof __initial_auth_token !== 'undefined') {
-            await signInWithCustomToken(auth, __initial_auth_token);
+        // تم التعديل هنا: استخدام window.__initial_auth_token
+        if (typeof window.__initial_auth_token !== 'undefined') {
+            await signInWithCustomToken(auth, window.__initial_auth_token);
         } else {
             await signInAnonymously(auth);
         }
@@ -1083,4 +1085,3 @@ function App() {
 }
 
 export default App;
-
