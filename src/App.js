@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+// eslint-disable-next-line no-unused-vars
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth'; // تم إضافة تعليق لتجاهل تحذير eslint هنا
 import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot } from 'firebase/firestore';
 import { initializeApp } from 'firebase/app';
 
@@ -7,7 +8,6 @@ import { initializeApp } from 'firebase/app';
 const IS_CANVAS_ENVIRONMENT = typeof window.__app_id !== 'undefined';
 
 // Determine the appId for Firestore paths.
-// In Canvas, it uses the injected __app_id. For external deployment, it's a fixed string.
 const appId = IS_CANVAS_ENVIRONMENT ? window.__app_id : "alghazali-family-app-deploy";
 
 // Determine Firebase configuration.
@@ -145,7 +145,7 @@ function App() {
         });
         return () => unsubscribe();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [firebaseEnabled]); // تم إضافة تعليق لتجاهل تحذير eslint هنا
+    }, [firebaseEnabled]);
 
     useEffect(() => {
         if (!currentUser || !firebaseEnabled) {
@@ -185,7 +185,7 @@ function App() {
             unsubscribeComments();
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentUser, firebaseEnabled]); // تم إضافة تعليق لتجاهل تحذير eslint هنا
+    }, [currentUser, firebaseEnabled]);
 
     const showTemporaryMessage = (message, type = 'info') => {
         setTempMessage(message);
