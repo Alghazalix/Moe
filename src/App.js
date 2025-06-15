@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 // eslint-disable-next-line no-unused-vars
-import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth'; // تم إضافة تعليق لتجاهل تحذير eslint هنا
+import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot } from 'firebase/firestore';
 import { initializeApp } from 'firebase/app';
 
-// Define if the app is running in the Canvas environment (where __app_id, etc., are injected)
+// Define if the app is running in the Canvas environment
 const IS_CANVAS_ENVIRONMENT = typeof window.__app_id !== 'undefined';
 
 // Determine the appId for Firestore paths.
@@ -27,6 +27,7 @@ let firestoreDbInstance;
 let firebaseAuthInstance;
 let firebaseEnabled = false;
 
+// Check if enough config is present to actually initialize Firebase
 const shouldInitializeFirebase = IS_CANVAS_ENVIRONMENT || (
     firebaseConfig.projectId && firebaseConfig.apiKey && firebaseConfig.authDomain
 );
@@ -77,7 +78,8 @@ if (!firebaseEnabled) {
     };
 }
 
-const nameKeys = ['يامن', 'غوث', 'الغوث', 'غياث'];
+// Removed 'الغوث'
+const nameKeys = ['يامن', 'غوث', 'غياث'];
 
 function App() {
     const [activeTab, setActiveTab] = useState('analysis');
@@ -87,13 +89,13 @@ function App() {
     const [votes, setVotes] = useState({
         'يامن': 0,
         'غوث': 0,
-        'الغوث': 0,
         'غياث': 0
     });
     const [comments, setComments] = useState([]);
     const [newComment, setNewComment] = useState('');
     const [currentUser, setCurrentUser] = useState(null);
     const [tempMessage, setTempMessage] = useState('');
+    const [tempMessageType, setTempMessageType] = useState('info'); // Added for message type
 
     const [generatedBlessing, setGeneratedBlessing] = useState('');
     const [loadingBlessing, setLoadingBlessing] = useState(false);
@@ -103,7 +105,37 @@ function App() {
     const [expandedName, setExpandedName] = useState(null);
     const [funFact, setFunFact] = useState('');
     const [nameVibeInput, setNameVibeInput] = useState('');
-    const [vibeChosen, setVibeChosen] = useState({});
+    // Use an object to store counts for each vibe for each name
+    const [vibeChosenCounts, setVibeChosenCounts] = useState({});
+
+
+    // Countdown state
+    const targetDate = new Date('2025-06-03T00:00:00'); // June 3, 2025
+    const [countdown, setCountdown] = useState({});
+
+    useEffect(() => {
+        const calculateCountdown = () => {
+            const now = new Date();
+            const difference = targetDate.getTime() - now.getTime();
+
+            if (difference <= 0) {
+                setCountdown({ days: 0, hours: 0, minutes: 0, seconds: 0, message: "لقد وصل المولود المنتظر! تهانينا!" });
+                return;
+            }
+
+            const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+
+            setCountdown({ days, hours, minutes, seconds, message: '' });
+        };
+
+        calculateCountdown(); // Initial call
+        const timer = setInterval(calculateCountdown, 1000); // Update every second
+
+        return () => clearInterval(timer);
+    }, []); // Empty dependency array means this runs once on mount
 
     // Firebase Authentication & Listeners
     useEffect(() => {
@@ -149,14 +181,14 @@ function App() {
 
     useEffect(() => {
         if (!currentUser || !firebaseEnabled) {
-            setVotes({ 'يامن': 0, 'غوث': 0, 'الغوث': 0, 'غياث': 0 });
+            setVotes({ 'يامن': 0, 'غوث': 0, 'غياث': 0 }); // Updated initial votes
             setComments([]);
             return;
         }
 
         const votesCollectionRef = collection(firestoreDbInstance, `artifacts/${appId}/public/data/nameVotes`);
         const unsubscribeVotes = onSnapshot(votesCollectionRef, (snapshot) => {
-            const currentVotes = { 'يامن': 0, 'غوث': 0, 'الغوث': 0, 'غياث': 0 };
+            const currentVotes = { 'يامن': 0, 'غوث': 0, 'غياث': 0 }; // Updated current votes
             snapshot.forEach((doc) => {
                 const data = doc.data();
                 if (data.name in currentVotes) {
@@ -189,10 +221,10 @@ function App() {
 
     const showTemporaryMessage = (message, type = 'info') => {
         setTempMessage(message);
-        const color = type === 'error' ? 'bg-red-600' : (type === 'success' ? 'bg-green-600' : 'bg-blue-600');
+        setTempMessageType(type); // Set message type
         const messageBox = document.getElementById('temp-message-box');
         if (messageBox) {
-            messageBox.className = `fixed top-4 right-4 text-white p-3 rounded-lg shadow-lg z-50 animate-fadeInOut ${color}`;
+            messageBox.className = `fixed top-4 right-4 text-white p-3 rounded-lg shadow-lg z-50 animate-fadeInOut ${type === 'error' ? 'bg-red-600' : (type === 'success' ? 'bg-green-600' : 'bg-blue-600')}`;
         }
         setTimeout(() => setTempMessage(''), 3000);
     };
@@ -294,11 +326,17 @@ function App() {
         showTemporaryMessage(`تم تحديد هويتك كـ ${newUserName}.`, 'info');
     };
 
+    // Modified to handle Gemini API calls conditionally (only in Canvas env for now)
     const generateTextWithGemini = async (prompt) => {
+        if (!IS_CANVAS_ENVIRONMENT) {
+            // Return a placeholder message if not in Canvas env
+            return "ميزات الذكاء الاصطناعي معطلة في هذا الإصدار المنشور. يرجى التفاعل داخل بيئة الكانفاس لتفعيلها.";
+        }
+
         const chatHistory = [];
         chatHistory.push({ role: "user", parts: [{ text: prompt }] });
         const payload = { contents: chatHistory };
-        const apiKey = "";
+        const apiKey = ""; // API key is handled by the Canvas environment for direct calls
         const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
         try {
@@ -325,8 +363,7 @@ function App() {
     const handleGenerateBlessing = async (name, meaning) => {
         setLoadingBlessing(true);
         setGeneratedBlessing('');
-        const prompt = `اكتب لي بركة قصيرة أو بضعة أبيات شعرية جميلة لمولود اسمه ${name}، مع الأخذ في الاعتبار أن معنى اسمه هو: "${meaning}". اجعلها في حدود 3-4 جمل أو بيتين شعرية، بأسلوب عربي فصيح وجميل.`;
-        const text = await generateTextWithGemini(prompt);
+        const text = await generateTextWithGemini(`اكتب لي بركة قصيرة أو بضعة أبيات شعرية جميلة لمولود اسمه ${name}، مع الأخذ في الاعتبار أن معنى اسمه هو: "${meaning}". اجعلها في حدود 3-4 جمل أو بيتين شعرية، بأسلوب عربي فصيح وجميل.`);
         setGeneratedBlessing(text);
         setLoadingBlessing(false);
     };
@@ -334,24 +371,29 @@ function App() {
     const handleGenerateSimilarNames = async (name, meaning) => {
         setLoadingSuggestions(prev => ({ ...prev, [name]: true }));
         setSuggestedNamesForCard(prev => ({ ...prev, [name]: '' }));
-        const prompt = `اقترح 3 أسماء عربية (أولاد) أخرى ذات دلالات إيجابية مشابهة لاسم "${name}" الذي يعني "${meaning}"، مع ذكر معنى كل اسم بشكل موجز، بصيغة قائمة مرقمة (مثال: 1. اسم: معناه). لا تكتب أي مقدمة أو خاتمة، فقط القائمة.`;
-        const text = await generateTextWithGemini(prompt);
+        const text = await generateTextWithGemini(`اقترح 3 أسماء عربية (أولاد) أخرى ذات دلالات إيجابية مشابهة لاسم "${name}" الذي يعني "${meaning}"، مع ذكر معنى كل اسم بشكل موجز، بصيغة قائمة مرقمة (مثال: 1. اسم: معناه). لا تكتب أي مقدمة أو خاتمة، فقط القائمة.`);
         setSuggestedNamesForCard(prev => ({ ...prev, [name]: text }));
         setLoadingSuggestions(prev => ({ ...prev, [name]: false }));
     };
 
     const handleGenerateFunFact = async (name) => {
         showTemporaryMessage(`جاري توليد معلومة شيقة عن اسم "${name}"...`, 'info');
-        const prompt = `اكتب معلومة شيقة ومختصرة (جملة واحدة) عن اسم "${name}" أو دلالاته الثقافية أو التاريخية أو اللغوية، بطريقة تجذب الانتباه.`;
-        const text = await generateTextWithGemini(prompt);
+        const text = await generateTextWithGemini(`اكتب معلومة شيقة ومختصرة (جملة واحدة) عن اسم "${name}" أو دلالاته الثقافية أو التاريخية أو اللغوية، بطريقة تجذب الانتباه.`);
         setFunFact(text);
     };
 
     const handleNameVibeSubmission = (name, vibe) => {
-        setVibeChosen(prev => ({ ...prev, [name]: vibe }));
+        setVibeChosenCounts(prevCounts => {
+            const newCounts = { ...prevCounts };
+            if (!newCounts[name]) newCounts[name] = {};
+            newCounts[name][vibe] = (newCounts[name][vibe] || 0) + 1;
+            return newCounts;
+        });
         showTemporaryMessage(`تم اختيار "${vibe}" لاسم ${name}!`, 'success');
     };
 
+
+    // Updated nameDetails - 'الغوث' removed
     const nameDetails = {
         'يامن': {
             meaning: 'المبارك، الميمون، ذو اليمين، كثير اليمن والبركة.',
@@ -388,27 +430,8 @@ function App() {
             otherMeaning: 'لا يوجد معنى سلبي في لغات أخرى معروفة، وهو ما يجعله آمناً للاستخدام.',
             uniqueness: 'فريد جداً وغير شائع، مما يمنح حامله تميزاً كبيبيراً ويجعله ملفتاً للنظر.',
             acceptance: 'مقبول ولكنه غير مألوف بشكل واسع كاسم شخصي، وقد يثير بعض الاستفسارات حول معناه أو سبب اختياره.',
-            alternativeInterpretation: 'لا يوجد اختلاف جوهري في تفسير هذا الاسم، فدلالاته على الإغاثة والعون واضحة ومباشرة.',
+            alternativeInterpretation: 'لا يوجد اختلاف جوهري في تفسير هذا الاسم، فdلالاته على الإغاثة والعون واضحة ومباشرة.',
             score: 8.0
-        },
-        'الغوث': {
-            meaning: 'المغيث الوحيد، الملاذ، الاسم الديني الذي يطلق على صاحب المقام الروحي العالي في بعض التصوف.',
-            origin: 'عربي أصيل.',
-            linguistic: 'نفس معنى "غوث" ولكن بإضافة "أل" التعريف التي تجعل المعنى أكثر تحديداً وشمولاً وإطلاقاً. صوت جهوري وذو هيبة.',
-            psychological: 'قد يُشعر حامله بعبء كبير لتلبية توقعات الاسم، ويُضفي هيبة قد تكون زائدة لطفل صغير. يرتبط بالسلطة المطلقة والمساعدة الشاملة التي لا تكون إلا لله.',
-            cultural: 'لا يُستخدم كاسم للمواليد إطلاقاً في الثقافة العربية والإسلامية. يُستخدم كلقب أو رتبة دينية/صوفية عالية جداً، ويُعتقد أنه يُشير إلى قطب الزمان أو المرجع الروحي الأعلى في بعض الفرق الصوفية.',
-            religious: 'هنا تكمن الحساسية الدينية الشديدة. "الغوث" بأل التعريف يُطلق على الله سبحانه وتعالى (المغيث). تسمية الإنسان به مباشرةً قد تُعد غير لائقة أو حتى محرمة عند بعض العلماء، لأنها تُضفي عليه صفة من صفات الألوهية أو تُشير إلى مرتبة دينية لا يجوز ادعاؤها. الأفضل والأجوز شرعاً هو "عبد الغوث" (عبد المغيث).',
-            popularity: 'غير مستخدم كاسم شخصي للمواليد، بل هو لقب ديني خاص جداً.',
-            practical: 'غير عملي كاسم شخصي أبداً، وقد يسبب لبساً أو إحراجاً دينياً واجتماعياً لحامله. صعوبة النطق نفسها كـ "غوث" مع إضافة "أل" التعريف.',
-            futuristic: 'لن يكون مقبولاً كاسم في أي سياق مستقبلي، وقد يُساء فهمه بشكل كبير في المجتمع، مما قد يؤثر سلباً على حامله.',
-            personalStrength: 'يوحي بقوة خارقة ودعم إلهي، لكنه غير مناسب للاستخدام البشري كاسم. هذا الاسم لا يمكن أن يكون معياراً للقوة الشخصية لطفل، بل قد يكون عبئاً عليه.',
-            compatibility: 'لا يمكن تقييم التناسب مع اللقب لأنه ليس اسماً شخصياً مناسباً للاستخدام البشري.',
-            rhythm: 'قوي ومسيطر جداً، ولكنه غير مناسب لطفل أو شخص عادي.',
-            otherMeaning: 'لا يوجد.',
-            uniqueness: 'فريد بمعنى أنه غير مستخدم كاسم شخصي على الإطلاق.',
-            acceptance: 'غير مقبول كاسم شخصي في الثقافة الإسلامية والعربية بشكل عام، ويُعد من الأسماء التي يُنهى عن التسمية بها.',
-            alternativeInterpretation: 'لا يوجد اختلاف جوهري في تفسير هذا الاسم، فدلالاته على الإغاثة والعون واضحة ومباشرة.',
-            score: 2.0
         },
         'غياث': {
             meaning: 'الناصر، المنجد، المساعد، الذي يُغاث به الناس، المطر الذي يأتي بالخير بعد الجدب.',
@@ -559,7 +582,8 @@ function App() {
     const sortedComparisonData = [...comparisonData].sort((a, b) => b.score - a.score);
 
     const Recommendation = () => {
-        const suitableNames = sortedComparisonData.filter(name => name.name !== 'الغوث');
+        // No need to filter 'الغوث' anymore as it's removed from nameDetails
+        const suitableNames = sortedComparisonData;
 
         let primaryRecommendationNames = [];
         if (suitableNames.some(n => n.name === 'يامن')) {
@@ -661,14 +685,22 @@ function App() {
     return (
         <div className="font-inter bg-gradient-to-b from-blue-50 to-indigo-100 min-h-screen p-4 sm:p-8 flex flex-col items-center">
             {tempMessage && (
-                <div id="temp-message-box" className="fixed top-4 right-4 bg-blue-600 text-white p-3 rounded-lg shadow-lg z-50 animate-fadeInOut">
+                <div id="temp-message-box" className={`fixed top-4 right-4 text-white p-3 rounded-lg shadow-lg z-50 animate-fadeInOut 
+                    ${tempMessageType === 'error' ? 'bg-red-600' : (tempMessageType === 'success' ? 'bg-green-600' : 'bg-blue-600')}`}
+                >
                     {tempMessage}
                 </div>
             )}
             {!firebaseEnabled && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4 w-full max-w-xl text-center shadow-md animate-fadeIn">
                     <strong className="font-bold">تنبيه: </strong>
-                    <span className="block sm:inline">وظائف حفظ البيانات (التصويت، التعليقات) غير نشطة حالياً. يرجى إعداد مشروع Firebase الخاص بكم لتفعيلها لاحقاً.</span>
+                    <span className="block sm:inline">وظائف حفظ البيانات (التصويت، التعليقات) **معطلة حالياً**. يرجى إعداد مشروع Firebase الخاص بكم لتفعيلها لاحقاً.</span>
+                </div>
+            )}
+            {!IS_CANVAS_ENVIRONMENT && ( // Show this message ONLY if not in Canvas env
+                <div className="bg-orange-100 border border-orange-400 text-orange-700 px-4 py-3 rounded-lg relative mb-4 w-full max-w-xl text-center shadow-md animate-fadeIn">
+                    <strong className="font-bold">ملاحظة: </strong>
+                    <span className="block sm:inline">ميزات الذكاء الاصطناعي (توليد البركات والمعلومات) **معطلة حالياً** في هذا الإصدار المنشور لضمان استقرار التطبيق.</span>
                 </div>
             )}
             <div className="w-full max-w-6xl bg-white rounded-xl shadow-2xl overflow-hidden mb-8 transform transition-all duration-300">
@@ -680,9 +712,16 @@ function App() {
                     <p className="text-lg sm:text-xl font-light opacity-90">
                         رحلة ممتعة ومدروسة لاختيار الاسم المثالي لطفلكما يا عائلة الغزالي الكريمة.
                     </p>
-                    <div className="mt-4 text-sm font-light opacity-80">
-                        تاريخ الميلاد المتوقع: 3 يونيو 2025
-                    </div>
+                    {countdown.message ? (
+                        <div className="mt-4 text-xl font-bold text-yellow-300 animate-pulse">{countdown.message}</div>
+                    ) : (
+                        <div className="mt-4 text-sm font-light opacity-80">
+                            تاريخ الميلاد المتوقع: 3 يونيو 2025
+                            <div className="text-yellow-300 text-lg sm:text-xl font-bold mt-2 animate-bounce-text-once-slow">
+                                {`${countdown.days} يوماً, ${countdown.hours} ساعة, ${countdown.minutes} دقيقة, ${countdown.seconds} ثانية`}
+                            </div>
+                        </div>
+                    )}
                 </header>
 
                 <nav className="bg-gradient-to-r from-blue-500 to-indigo-600 p-3 shadow-md">
@@ -709,13 +748,13 @@ function App() {
                     {activeTab === 'analysis' && (
                         <section className="animate-fadeIn">
                             <h2 className="text-3xl font-bold text-center text-indigo-700 mb-8 border-b-2 border-indigo-400 pb-4">
-                                تحليل شامل لأسماء: <span className="text-purple-600">يامن، غوث، الغوث، غياث</span>
+                                تحليل شامل لأسماء: <span className="text-purple-600">يامن، غوث، غياث</span>
                             </h2>
                             <p className="text-center text-gray-600 italic mb-6">
                                 (انقر على أي اسم أدناه لعرض تحليله المفصل.)
                             </p>
 
-                            <div className={`grid ${expandedName ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-4'} gap-6`}>
+                            <div className={`grid ${expandedName ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'} gap-6`}>
                                 {nameKeys.map((nameKey) => (
                                     <AnalysisCard
                                         key={nameKey}
@@ -779,9 +818,9 @@ function App() {
                                                     <button
                                                         key={`${vibe}-${name}`}
                                                         onClick={() => handleNameVibeSubmission(name, vibe)}
-                                                        className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${vibeChosen[name] === vibe ? 'bg-indigo-600 text-white shadow-lg' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                                                        className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${vibeChosenCounts[name] && vibeChosenCounts[name][vibe] ? 'bg-indigo-600 text-white shadow-lg' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
                                                     >
-                                                        {name}
+                                                        {name} {vibeChosenCounts[name] && vibeChosenCounts[name][vibe] ? `(${vibeChosenCounts[name][vibe]})` : ''}
                                                     </button>
                                                 ))}
                                             </div>
@@ -868,7 +907,7 @@ function App() {
                                 </p>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10"> {/* Changed to 3 columns */}
                                 {Object.keys(nameDetails).map(name => (
                                     <div key={name} className="bg-white rounded-xl shadow-lg p-5 text-center transform transition-transform duration-300 hover:scale-105 hover:shadow-xl border border-indigo-200 flex flex-col justify-between">
                                         <div>
@@ -1026,12 +1065,6 @@ function App() {
                                                 <td className="py-3 px-4 border-b border-gray-200 text-center text-xl font-bold text-orange-600">جيد (8.0)</td>
                                             </tr>
                                             <tr className="bg-gray-50 hover:bg-teal-50">
-                                                <td className="py-3 px-4 border-b border-gray-200 font-semibold text-teal-700">الغوث</td>
-                                                <td className="py-3 px-4 border-b border-gray-200 text-gray-700">لا يوجد نقاط قوة كاسم شخصي.</td>
-                                                <td className="py-3 px-4 border-b border-gray-200 text-gray-700">غير مناسب كاسم شخصي على الإطلاق لاعتبارات دينية وكونه لقباً حصرياً.</td>
-                                                <td className="py-3 px-4 border-b border-gray-200 text-center text-xl font-bold text-red-600">غير مناسب (2.0)</td>
-                                            </tr>
-                                            <tr className="bg-white hover:bg-teal-50">
                                                 <td className="py-3 px-4 border-b border-gray-200 font-semibold text-teal-700">غياث</td>
                                                 <td className="py-3 px-4 border-b border-gray-200 text-gray-700">قوة المعنى (إغاثة سخية)، مقبول وشائع، توافق جيد مع اللقب.</td>
                                                 <td className="py-3 px-4 border-b border-gray-200 text-gray-700">أقل شهرة من "يامن".</td>
@@ -1103,6 +1136,20 @@ function App() {
                         </section>
                     )}
                 </main>
+                <footer className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-4 text-center rounded-b-xl shadow-inner mt-8">
+                    <p className="text-sm opacity-90 mb-2">صُنع بحب لعائلة الغزالي 💖</p>
+                    <button
+                        onClick={() => {
+                            navigator.clipboard.writeText(window.location.href)
+                                .then(() => showTemporaryMessage("تم نسخ رابط التطبيق بنجاح!", 'success'))
+                                .catch(() => showTemporaryMessage("فشل نسخ الرابط. الرجاء النسخ يدوياً.", 'error'));
+                        }}
+                        className="bg-white text-indigo-700 px-4 py-2 rounded-full text-sm font-semibold hover:bg-gray-100 transition-colors shadow-md flex items-center justify-center mx-auto"
+                    >
+                        <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7v4a1 1 0 001 1h4m-4 0h4m-4 0v4m0 0H9m-4 0v4m0 0H5m4 0V9m0 0H9"></path></svg>
+                        <span>مشاركة الرابط</span>
+                    </button>
+                </footer>
             </div>
             <style>{`
                 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&family=Inter:wght@300;400;600;700;800&display=swap');
@@ -1146,7 +1193,7 @@ function App() {
                     0% { opacity: 0.7; }
                     100% { opacity: 1; }
                 }
-
+                
                 .animate-bounce-text-once {
                     animation: bounceText 0.8s ease-out 1;
                 }
@@ -1156,6 +1203,17 @@ function App() {
                     50% { transform: translateY(0); }
                     75% { transform: translateY(-4px); }
                 }
+
+                .animate-bounce-text-once-slow {
+                    animation: bounceTextSlow 2s ease-out infinite;
+                }
+                @keyframes bounceTextSlow {
+                    0%, 100% { transform: translateY(0); }
+                    25% { transform: translateY(-5px); }
+                    50% { transform: translateY(0); }
+                    75% { transform: translateY(-2px); }
+                }
+
                 .animate-fadeInOut {
                     animation: fadeInOut 3s forwards;
                 }
