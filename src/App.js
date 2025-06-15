@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 // eslint-disable-next-line no-unused-vars
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot } from 'firebase/firestore';
@@ -78,7 +78,27 @@ if (!firebaseEnabled) {
     };
 }
 
-// Removed 'الغوث'
+// Pre-defined static content for "AI-like" generation
+const staticBlessings = {
+    'يامن': "تبارك الرحمن يامن، يا قرة العين ونور الدرب، لتكن حياتك مليئة باليُمن والبركات، تسعد بها القلوب وتُبهج الأرواح. اللهم اجعله مباركاً أينما كان، وسعيداً أينما حلّ، وقرة عين لوالديه.",
+    'غوث': "يا غوثاً للضعيف ونصيراً للمظلوم، لتكن حياتك منارة للعون والسند، تملؤها الشجاعة والنخوة. نسأل الله أن يجعلك دائماً سبباً في إغاثة المحتاج، ومصدراً للقوة والعطاء، وسنداً لعائلتك.",
+    'غياث': "يا غياث القلوب وناصر الأرواح، لتكن حياتك سلسلة من الإغاثات والعطاءات السخية، تنشر الخير والفرح حيثما ذهبت. اللهم اجعله مباركاً في سعيه، وعوناً للملهوف، ونعمة عظيمة لوالديه ووطنه.",
+};
+
+const staticFunFacts = {
+    'يامن': "يُعتقد أن اسم يامن يأتي من 'اليُمن' ويعني البركة والخير، ويرتبط بالجانب الأيمن الذي غالباً ما يرمز للقوة والخير في الثقافة العربية.",
+    'غوث': "اسم غوث من الأسماء ذات الدلالة العميقة على الإغاثة والنجدة، وقد ارتبط تاريخياً بالأشخاص الذين يقدمون العون في الشدائد.",
+    'غياث': "غياث هي صيغة مبالغة من غوث، تدل على كثرة الإغاثة، ويُعرف أيضاً بالمطر الغزير الذي يأتي بالخير بعد الجفاف.",
+};
+
+const staticSimilarNames = {
+    'يامن': "1. أمين: يعني الموثوق والجدير بالثقة.\n2. سليم: يعني الخالي من العيوب والآفات، ويوحي بالصحة والسلامة.\n3. رشاد: يعني الهداية والصلاح، ويوحي بالرشاد والتوجيه الصحيح.",
+    'غوث': "1. نجدة: تعني المساعدة والإغاثة في الشدائد.\n2. معين: يعني المساعد والداعم الذي يقدم العون.\n3. منذر: يعني الذي ينذر ويحذر من الخطر، ويوحي بالشجاعة واليقظة.",
+    'غياث': "1. نصير: يعني الداعم والمعين بقوة.\n2. فداء: يعني التضحية والعطاء من أجل الآخرين.\n3. أويس: اسم عربي جميل يحمل معنى الذئب الصغير، ويرتبط بالشجاعة والقوة.",
+};
+
+
+// Names, 'الغوث' is intentionally removed from nameKeys as per previous request
 const nameKeys = ['يامن', 'غوث', 'غياث'];
 
 function App() {
@@ -95,7 +115,7 @@ function App() {
     const [newComment, setNewComment] = useState('');
     const [currentUser, setCurrentUser] = useState(null);
     const [tempMessage, setTempMessage] = useState('');
-    const [tempMessageType, setTempMessageType] = useState('info'); // Added for message type
+    const [tempMessageType, setTempMessageType] = useState('info');
 
     const [generatedBlessing, setGeneratedBlessing] = useState('');
     const [loadingBlessing, setLoadingBlessing] = useState(false);
@@ -104,10 +124,33 @@ function App() {
 
     const [expandedName, setExpandedName] = useState(null);
     const [funFact, setFunFact] = useState('');
-    const [nameVibeInput, setNameVibeInput] = useState('');
-    // Use an object to store counts for each vibe for each name
-    const [vibeChosenCounts, setVibeChosenCounts] = useState({});
+    const [nameVibeInput, setNameVibeInput] = useState(() => localStorage.getItem('nameVibeInput') || '');
+    // Storing vibe selections in localStorage for persistence, using a ref for initial load
+    const initialVibeCounts = useRef(JSON.parse(localStorage.getItem('vibeChosenCounts') || '{}'));
+    const [vibeChosenCounts, setVibeChosenCounts] = useState(initialVibeCounts.current);
 
+    // Quiz Game States
+    const [quizStarted, setQuizStarted] = useState(false);
+    const [currentQuizQuestionIndex, setCurrentQuizQuestionIndex] = useState(0);
+    const [quizScores, setQuizScores] = useState({});
+    const [quizResult, setQuizResult] = useState(null);
+
+    // Name Vibe Matching Game States
+    const [vibeGameStarted, setVibeGameStarted] = useState(false);
+    const [vibeGameCurrentName, setVibeGameCurrentName] = useState(null);
+    const [vibeGameOptions, setVibeGameOptions] = useState([]);
+    const [vibeGameScore, setVibeGameScore] = useState(0);
+    const [vibeGameMatches, setVibeGameMatches] = useState({}); // { name: [selectedVibe, correctVibe] }
+    const vibeGameNames = ['يامن', 'غوث', 'غياث'];
+    const vibeDefinitions = {
+        'يامن': ['بركة', 'تفاؤل', 'حظ سعيد', 'هادئ'],
+        'غوث': ['شجاعة', 'نجدة', 'قوة', 'مبادرة'],
+        'غياث': ['عطاء', 'مساعدة', 'قيادة', 'إيجابية'],
+    };
+
+
+    // Ref to track if initial Firebase sign-in attempt has been made
+    const initialSignInAttempted = useRef(false);
 
     // Countdown state
     const targetDate = new Date('2025-06-03T00:00:00'); // June 3, 2025
@@ -131,35 +174,25 @@ function App() {
             setCountdown({ days, hours, minutes, seconds, message: '' });
         };
 
-        calculateCountdown(); // Initial call
-        const timer = setInterval(calculateCountdown, 1000); // Update every second
+        calculateCountdown();
+        const timer = setInterval(calculateCountdown, 1000);
 
         return () => clearInterval(timer);
-    }, []); // Empty dependency array means this runs once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Empty dependency array means this runs once on mount, updates state, and cleanup runs on unmount.
 
-    // Firebase Authentication & Listeners
-    useEffect(() => {
-        const signIn = async () => {
-            if (IS_CANVAS_ENVIRONMENT) {
-                if (typeof window.__initial_auth_token !== 'undefined') {
-                    await signInWithCustomToken(firebaseAuthInstance, window.__initial_auth_token);
-                } else {
-                    await signInAnonymously(firebaseAuthInstance);
-                }
-            } else if (firebaseEnabled) {
-                await signInAnonymously(firebaseAuthInstance);
-            } else {
-                setCurrentUser({ uid: 'mock-user-id', isAnonymous: true });
-                setUserName('مستخدم مجهول');
-                setUserRole('guest');
-                return;
-            }
-        };
+    // Firebase Authentication & Listeners - Using useCallback to memoize and prevent infinite loops
+    const setupFirebaseAuth = useCallback(async () => {
+        if (!firebaseEnabled) {
+            setCurrentUser({ uid: 'mock-user-id', isAnonymous: true });
+            setUserName('مستخدم مجهول');
+            setUserRole('guest');
+            return;
+        }
 
-        signIn();
-
-        const unsubscribe = firebaseAuthInstance.onAuthStateChanged((user) => {
+        const unsubscribeAuth = onAuthStateChanged(firebaseAuthInstance, (user) => {
             setCurrentUser(user);
+
             if (user) {
                 const storedRole = localStorage.getItem('userRole');
                 const storedName = localStorage.getItem('userName');
@@ -171,24 +204,53 @@ function App() {
                     setUserRole(user.isAnonymous ? 'guest' : 'parent');
                 }
             } else {
-                setUserName('زائر');
-                setUserRole('guest');
+                if (!initialSignInAttempted.current) {
+                    initialSignInAttempted.current = true;
+                    if (IS_CANVAS_ENVIRONMENT && typeof window.__initial_auth_token !== 'undefined') {
+                        signInWithCustomToken(firebaseAuthInstance, window.__initial_auth_token)
+                            .then(userCredential => console.log("Signed in with custom token:", userCredential.user.uid))
+                            .catch(error => {
+                                console.error("Error signing in with custom token, falling back to anonymous:", error);
+                                signInAnonymously(firebaseAuthInstance)
+                                    .then(anonUserCredential => console.log("Signed in anonymously after custom token failure:", anonUserCredential.user.uid))
+                                    .catch(anonError => {
+                                        console.error("Final anonymous sign-in failed:", anonError);
+                                        showTemporaryMessage("فشل تسجيل الدخول التلقائي. قد لا تعمل بعض الميزات.", 'error');
+                                    });
+                            });
+                    } else {
+                        signInAnonymously(firebaseAuthInstance)
+                            .then(userCredential => console.log("Signed in anonymously:", userCredential.user.uid))
+                            .catch(error => {
+                                console.error("Error signing in anonymously:", error);
+                                showTemporaryMessage("فشل تسجيل الدخول التلقائي. قد لا تعمل بعض الميزات.", 'error');
+                            });
+                    }
+                } else {
+                    setUserName('زائر');
+                    setUserRole('guest');
+                }
             }
         });
-        return () => unsubscribe();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [firebaseEnabled]);
+
+        return () => unsubscribeAuth();
+    }, [firebaseEnabled]); // Recreate if firebaseEnabled changes
 
     useEffect(() => {
+        setupFirebaseAuth();
+    }, [setupFirebaseAuth]); // Run when setupFirebaseAuth changes
+
+    // Firestore Listeners
+    useEffect(() => {
         if (!currentUser || !firebaseEnabled) {
-            setVotes({ 'يامن': 0, 'غوث': 0, 'غياث': 0 }); // Updated initial votes
+            setVotes({ 'يامن': 0, 'غوث': 0, 'غياث': 0 });
             setComments([]);
             return;
         }
 
         const votesCollectionRef = collection(firestoreDbInstance, `artifacts/${appId}/public/data/nameVotes`);
         const unsubscribeVotes = onSnapshot(votesCollectionRef, (snapshot) => {
-            const currentVotes = { 'يامن': 0, 'غوث': 0, 'غياث': 0 }; // Updated current votes
+            const currentVotes = { 'يامن': 0, 'غوث': 0, 'غياث': 0 };
             snapshot.forEach((doc) => {
                 const data = doc.data();
                 if (data.name in currentVotes) {
@@ -221,7 +283,7 @@ function App() {
 
     const showTemporaryMessage = (message, type = 'info') => {
         setTempMessage(message);
-        setTempMessageType(type); // Set message type
+        setTempMessageType(type);
         const messageBox = document.getElementById('temp-message-box');
         if (messageBox) {
             messageBox.className = `fixed top-4 right-4 text-white p-3 rounded-lg shadow-lg z-50 animate-fadeInOut ${type === 'error' ? 'bg-red-600' : (type === 'success' ? 'bg-green-600' : 'bg-blue-600')}`;
@@ -326,44 +388,22 @@ function App() {
         showTemporaryMessage(`تم تحديد هويتك كـ ${newUserName}.`, 'info');
     };
 
-    // Modified to handle Gemini API calls conditionally (only in Canvas env for now)
-    const generateTextWithGemini = async (prompt) => {
-        if (!IS_CANVAS_ENVIRONMENT) {
-            // Return a placeholder message if not in Canvas env
-            return "ميزات الذكاء الاصطناعي معطلة في هذا الإصدار المنشور. يرجى التفاعل داخل بيئة الكانفاس لتفعيلها.";
+    // Modified to return static content
+    const getStaticContent = (type, name, meaning = '') => {
+        if (type === 'blessing') {
+            return staticBlessings[name] || "لا توجد بركة محددة لهذا الاسم حالياً.";
+        } else if (type === 'funFact') {
+            return staticFunFacts[name] || "لا توجد معلومة شيقة محددة لهذا الاسم حالياً.";
+        } else if (type === 'similarNames') {
+            return staticSimilarNames[name] || "لا توجد أسماء مشابهة مقترحة لهذا الاسم حالياً.";
         }
-
-        const chatHistory = [];
-        chatHistory.push({ role: "user", parts: [{ text: prompt }] });
-        const payload = { contents: chatHistory };
-        const apiKey = ""; // API key is handled by the Canvas environment for direct calls
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
-
-        try {
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            const result = await response.json();
-            if (result.candidates && result.candidates.length > 0 &&
-                result.candidates[0].content && result.candidates[0].content.parts &&
-                result.candidates[0].content.parts.length > 0) {
-                return result.candidates[0].content.parts[0].text;
-            } else {
-                console.error("Unexpected Gemini API response structure:", result);
-                return "حدث خطأ في التوليد. الرجاء المحاولة مرة أخرى.";
-            }
-        } catch (error) {
-            console.error("Error calling Gemini API:", error);
-            return "تعذر التواصل مع خدمة التوليد. الرجاء التحقق من اتصال الإنترنت.";
-        }
+        return "المحتوى غير متوفر.";
     };
 
     const handleGenerateBlessing = async (name, meaning) => {
         setLoadingBlessing(true);
         setGeneratedBlessing('');
-        const text = await generateTextWithGemini(`اكتب لي بركة قصيرة أو بضعة أبيات شعرية جميلة لمولود اسمه ${name}، مع الأخذ في الاعتبار أن معنى اسمه هو: "${meaning}". اجعلها في حدود 3-4 جمل أو بيتين شعرية، بأسلوب عربي فصيح وجميل.`);
+        const text = getStaticContent('blessing', name);
         setGeneratedBlessing(text);
         setLoadingBlessing(false);
     };
@@ -371,14 +411,14 @@ function App() {
     const handleGenerateSimilarNames = async (name, meaning) => {
         setLoadingSuggestions(prev => ({ ...prev, [name]: true }));
         setSuggestedNamesForCard(prev => ({ ...prev, [name]: '' }));
-        const text = await generateTextWithGemini(`اقترح 3 أسماء عربية (أولاد) أخرى ذات دلالات إيجابية مشابهة لاسم "${name}" الذي يعني "${meaning}"، مع ذكر معنى كل اسم بشكل موجز، بصيغة قائمة مرقمة (مثال: 1. اسم: معناه). لا تكتب أي مقدمة أو خاتمة، فقط القائمة.`);
+        const text = getStaticContent('similarNames', name);
         setSuggestedNamesForCard(prev => ({ ...prev, [name]: text }));
         setLoadingSuggestions(prev => ({ ...prev, [name]: false }));
     };
 
     const handleGenerateFunFact = async (name) => {
         showTemporaryMessage(`جاري توليد معلومة شيقة عن اسم "${name}"...`, 'info');
-        const text = await generateTextWithGemini(`اكتب معلومة شيقة ومختصرة (جملة واحدة) عن اسم "${name}" أو دلالاته الثقافية أو التاريخية أو اللغوية، بطريقة تجذب الانتباه.`);
+        const text = getStaticContent('funFact', name);
         setFunFact(text);
     };
 
@@ -387,13 +427,45 @@ function App() {
             const newCounts = { ...prevCounts };
             if (!newCounts[name]) newCounts[name] = {};
             newCounts[name][vibe] = (newCounts[name][vibe] || 0) + 1;
+            localStorage.setItem('vibeChosenCounts', JSON.stringify(newCounts)); // Persist locally
             return newCounts;
         });
         showTemporaryMessage(`تم اختيار "${vibe}" لاسم ${name}!`, 'success');
     };
 
+    // Tone.js sound playing function
+    const playNameSound = (name) => {
+        if (typeof window.Tone === 'undefined') {
+            showTemporaryMessage("مكتبة الصوت غير متاحة. يرجى التأكد من تحميل Tone.js CDN.", 'error');
+            return;
+        }
 
-    // Updated nameDetails - 'الغوث' removed
+        const synth = new window.Tone.Synth().toDestination();
+        let melody;
+        switch (name) {
+            case 'يامن':
+                melody = ["C4", "E4", "G4", "C5"];
+                break;
+            case 'غوث':
+                melody = ["G3", "D4", "G4", "B4"];
+                break;
+            case 'غياث':
+                melody = ["A3", "C4", "E4", "A4"];
+                break;
+            default:
+                melody = ["C4", "D4", "E4", "F4"];
+        }
+
+        let time = window.Tone.now();
+        melody.forEach(note => {
+            synth.triggerAttackRelease(note, "8n", time);
+            time += 0.2;
+        });
+        showTemporaryMessage(`يتم تشغيل نغمة لاسم ${name}`, 'info');
+    };
+
+
+    // Name Details (unchanged as per previous instructions, 'الغوث' is intentionally included as a name for analysis, but not in nameKeys for selection)
     const nameDetails = {
         'يامن': {
             meaning: 'المبارك، الميمون، ذو اليمين، كثير اليمن والبركة.',
@@ -430,7 +502,7 @@ function App() {
             otherMeaning: 'لا يوجد معنى سلبي في لغات أخرى معروفة، وهو ما يجعله آمناً للاستخدام.',
             uniqueness: 'فريد جداً وغير شائع، مما يمنح حامله تميزاً كبيبيراً ويجعله ملفتاً للنظر.',
             acceptance: 'مقبول ولكنه غير مألوف بشكل واسع كاسم شخصي، وقد يثير بعض الاستفسارات حول معناه أو سبب اختياره.',
-            alternativeInterpretation: 'لا يوجد اختلاف جوهري في تفسير هذا الاسم، فdلالاته على الإغاثة والعون واضحة ومباشرة.',
+            alternativeInterpretation: 'لا يوجد اختلاف جوهري في تفسير هذا الاسم، فدلالاته على الإغاثة والعون واضحة ومباشرة.',
             score: 8.0
         },
         'غياث': {
@@ -468,7 +540,7 @@ function App() {
             `}
             onClick={() => onExpand(isExpanded ? null : name)}
         >
-            <h3 className={`font-extrabold text-indigo-800 mb-4 ${isExpanded ? 'text-4xl sm:text-5xl border-b-4 border-indigo-400 pb-3' : 'text-2xl sm:text-3xl'}`}>
+            <h3 className={`font-extrabold text-indigo-800 mb-4 ${isExpanded ? 'text-4xl sm:text-5xl border-b-4 border-indigo-400 pb-3 font-cairo-display' : 'text-2xl sm:text-3xl font-cairo-display'}`}>
                 {name}
             </h3>
             {!isExpanded ? (
@@ -493,7 +565,7 @@ function App() {
                         ))}
                     </div>
                     <div className="mt-8 pt-6 border-t-2 border-indigo-200">
-                        <h4 className="text-2xl font-bold text-purple-700 mb-4">نشاطات إضافية حول الاسم:</h4>
+                        <h4 className="text-2xl font-bold text-purple-700 mb-4 font-cairo-display">نشاطات إضافية حول الاسم:</h4>
                         <button
                             onClick={(e) => { e.stopPropagation(); handleGenerateFunFact(name); }}
                             className="w-full bg-gradient-to-r from-teal-500 to-green-600 hover:from-teal-600 hover:to-green-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-teal-300 flex items-center justify-center space-x-2 mb-4"
@@ -528,10 +600,17 @@ function App() {
                         </button>
                         {suggestedNamesForCard[name] && (
                             <div className="mt-4 bg-purple-50 p-4 rounded-lg text-base text-gray-800 border border-purple-200 animate-fadeIn">
-                                <h4 className="font-semibold text-purple-700 mb-2 border-b border-purple-300 pb-1">أسماء مقترحة:</h4>
+                                <h4 className="font-semibold text-purple-700 mb-2 border-b border-purple-300 pb-1 font-cairo-display">أسماء مقترحة:</h4>
                                 <p className="whitespace-pre-wrap">{suggestedNamesForCard[name]}</p>
                             </div>
                         )}
+                        <button
+                            onClick={(e) => { e.stopPropagation(); playNameSound(name); }}
+                            className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 flex items-center justify-center space-x-2 mt-4"
+                        >
+                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M9.384 5.338A1 1 0 0110 5h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-.616-.162l-3-2A1 1 0 016 7V5a1 1 0 011-1h2.384zM10 2a8 8 0 110 16 8 8 0 010-16zM5 10a1 1 0 011-1h2.384l3 2a1 1 0 01.616.162V12a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" clipRule="evenodd"></path></svg>
+                            <span>استمع لنغمة الاسم</span>
+                        </button>
                     </div>
                 </>
             )}
@@ -560,7 +639,8 @@ function App() {
         }
     };
 
-    const comparisonData = Object.keys(nameDetails).map(name => ({
+    // Use nameKeys for comparison data to ensure 'الغوث' is included for analysis, even if not selected for new births
+    const comparisonData = nameKeys.map(name => ({
         name,
         score: nameDetails[name].score,
         meaning: nameDetails[name].meaning,
@@ -582,7 +662,6 @@ function App() {
     const sortedComparisonData = [...comparisonData].sort((a, b) => b.score - a.score);
 
     const Recommendation = () => {
-        // No need to filter 'الغوث' anymore as it's removed from nameDetails
         const suitableNames = sortedComparisonData;
 
         let primaryRecommendationNames = [];
@@ -606,7 +685,7 @@ function App() {
 
         return (
             <div className="bg-gradient-to-br from-purple-100 to-indigo-200 p-8 rounded-lg shadow-xl text-center border-4 border-purple-300">
-                <h2 className="text-4xl font-extrabold text-purple-800 mb-6 animate-pulse-fade">ترشيحاتنا الشخصية لكما</h2>
+                <h2 className="text-4xl font-extrabold text-purple-800 mb-6 animate-pulse-fade font-cairo-display">ترشيحاتنا الشخصية لكما</h2>
                 <p className="text-xl text-gray-700 mb-8">
                     من وجهة نظري الشخصية كمساعد افتراضي، وبعد التحليل الشامل لجميع الأسماء، أرشح لكما اسمين ممتازين لمولودكما. كل منهما يحمل دلالات عميقة وجميلة، ومقبول مجتمعياً ودينياً، ويتوافق بشكل رائع مع لقب "الغزالي" الكريم.
                 </p>
@@ -623,7 +702,7 @@ function App() {
                     <div className="mt-8 bg-white p-6 rounded-lg shadow-inner border-t-4 border-indigo-500 animate-fadeInUp">
                         {finalRecommended.map((rec, index) => (
                             <div key={rec.name} className={`mb-8 ${index === 0 && finalRecommended.length > 1 ? 'pb-8 border-b border-indigo-200' : ''}`}>
-                                <h3 className="text-3xl font-bold text-indigo-700 mb-4 flex items-center justify-center space-x-3">
+                                <h3 className="text-3xl font-bold text-indigo-700 mb-4 flex items-center justify-center space-x-3 font-cairo-display">
                                     <span>الاسم المقترح {index + 1}:</span> <span className="text-purple-600 transform animate-bounce-text-once">{rec.name}</span>
                                 </h3>
                                 <p className="text-lg text-gray-800 leading-relaxed mb-4">
@@ -665,7 +744,7 @@ function App() {
                                     </button>
                                     {generatedBlessing && (
                                         <div className="mt-4 bg-teal-50 p-4 rounded-lg text-lg text-gray-800 border border-teal-200 animate-fadeIn">
-                                            <h4 className="font-semibold text-teal-700 mb-2 border-b border-teal-300 pb-1">بركة لمولودكما:</h4>
+                                            <h4 className="font-semibold text-teal-700 mb-2 border-b border-teal-300 pb-1 font-cairo-display">بركة لمولودكما:</h4>
                                             <p className="whitespace-pre-wrap">{generatedBlessing}</p>
                                         </div>
                                     )}
@@ -681,9 +760,178 @@ function App() {
         );
     };
 
+    // Quiz Questions and Logic
+    const quizQuestions = [
+        {
+            question: "ما هي الصفة الأهم التي تتمنونها في شخصية طفلكما المستقبلية؟",
+            options: [
+                { text: "التفاؤل والبركة", scores: { 'يامن': 3, 'غوث': 1, 'غياث': 2 } },
+                { text: "الشجاعة والنجدة", scores: { 'يامن': 1, 'غوث': 3, 'غياث': 2 } },
+                { text: "العطاء والمساعدة", scores: { 'يامن': 2, 'غوث': 2, 'غياث': 3 } },
+            ]
+        },
+        {
+            question: "أي إيقاع صوتي للأسماء تفضلون؟",
+            options: [
+                { text: "إيقاع هادئ ومريح", scores: { 'يامن': 3, 'غوث': 1, 'غياث': 2 } },
+                { text: "إيقاع قوي ومباشر", scores: { 'يامن': 1, 'غوث': 3, 'غياث': 2 } },
+                { text: "إيقاع قوي وممتع", scores: { 'يامن': 2, 'غوث': 2, 'غياث': 3 } },
+            ]
+        },
+        {
+            question: "هل تفضلون اسماً شائعاً ومألوفاً أم مميزاً وغير تقليدي؟",
+            options: [
+                { text: "شائع ومألوف", scores: { 'يامن': 3, 'غوث': 1, 'غياث': 2 } },
+                { text: "مميز وغير تقليدي", scores: { 'يامن': 1, 'غوث': 3, 'غياث': 2 } },
+                { text: "متوازن بين الشهرة والتميز", scores: { 'يامن': 2, 'غوث': 2, 'غياث': 3 } },
+            ]
+        },
+        {
+            question: "ما هو الانطباع الذي ترغبون أن يتركه اسم طفلكما؟",
+            options: [
+                { text: "يوحي باليُمن والخير", scores: { 'يامن': 3, 'غوث': 1, 'غياث': 2 } },
+                { text: "يوحي بالإنقاذ والصلابة", scores: { 'يامن': 1, 'غوث': 3, 'غياث': 2 } },
+                { text: "يوحي بالعطاء والقيادة", scores: { 'يامن': 2, 'غوث': 2, 'غياث': 3 } },
+            ]
+        },
+    ];
+
+    const startQuiz = () => {
+        setQuizStarted(true);
+        setCurrentQuizQuestionIndex(0);
+        setQuizScores({ 'يامن': 0, 'غوث': 0, 'غياث': 0 });
+        setQuizResult(null);
+    };
+
+    const handleQuizAnswer = (scores) => {
+        setQuizScores(prevScores => {
+            const newScores = { ...prevScores };
+            for (const name in scores) {
+                newScores[name] += scores[name];
+            }
+            return newScores;
+        });
+
+        if (currentQuizQuestionIndex < quizQuestions.length - 1) {
+            setCurrentQuizQuestionIndex(prevIndex => prevIndex + 1);
+        } else {
+            // Quiz finished, determine result
+            let maxScore = -1;
+            let recommendedNames = [];
+            for (const name in quizScores) {
+                if (quizScores[name] > maxScore) {
+                    maxScore = quizScores[name];
+                    recommendedNames = [name];
+                } else if (quizScores[name] === maxScore) {
+                    recommendedNames.push(name);
+                }
+            }
+            setQuizResult(recommendedNames);
+        }
+    };
+
+    const resetQuiz = () => {
+        setQuizStarted(false);
+        setCurrentQuizQuestionIndex(0);
+        setQuizScores({});
+        setQuizResult(null);
+    };
+
+    // Name Vibe Matching Game Logic
+    const startVibeGame = () => {
+        setVibeGameStarted(true);
+        setVibeGameScore(0);
+        setVibeGameMatches({});
+        loadNextVibeGameName();
+    };
+
+    const loadNextVibeGameName = () => {
+        if (vibeGameNames.length > Object.keys(vibeGameMatches).length) {
+            let nextName;
+            do {
+                nextName = vibeGameNames[Math.floor(Math.random() * vibeGameNames.length)];
+            } while (vibeGameMatches[nextName]); // Ensure unique name
+
+            setVibeGameCurrentName(nextName);
+
+            // Shuffle vibes including correct ones
+            const correctVibes = vibeDefinitions[nextName];
+            let allPossibleVibes = new Set();
+            vibeGameNames.forEach(n => vibeDefinitions[n].forEach(v => allPossibleVibes.add(v)));
+            allPossibleVibes = Array.from(allPossibleVibes);
+
+            const shuffledOptions = [...correctVibes];
+            while (shuffledOptions.length < 4 && shuffledOptions.length < allPossibleVibes.length) {
+                const randomVibe = allPossibleVibes[Math.floor(Math.random() * allPossibleVibes.length)];
+                if (!shuffledOptions.includes(randomVibe)) {
+                    shuffledOptions.push(randomVibe);
+                }
+            }
+            // Shuffle the options to make order random
+            shuffledOptions.sort(() => Math.random() - 0.5);
+            setVibeGameOptions(shuffledOptions);
+
+        } else {
+            setVibeGameCurrentName(null); // Game over
+        }
+    };
+
+    const handleVibeMatch = (selectedVibe) => {
+        if (!vibeGameCurrentName) return;
+
+        const correctVibes = vibeDefinitions[vibeGameCurrentName];
+        const isCorrect = correctVibes.includes(selectedVibe);
+
+        setVibeGameMatches(prev => ({
+            ...prev,
+            [vibeGameCurrentName]: [selectedVibe, correctVibes[0]] // Store selected and one correct for display
+        }));
+
+        if (isCorrect) {
+            setVibeGameScore(prev => prev + 1);
+            showTemporaryMessage("إجابة صحيحة!", 'success');
+        } else {
+            showTemporaryMessage("إجابة خاطئة.", 'error');
+        }
+
+        setTimeout(() => {
+            loadNextVibeGameName();
+        }, 1000); // Give time for message to display
+    };
+
+    const resetVibeGame = () => {
+        setVibeGameStarted(false);
+        setVibeGameScore(0);
+        setVibeGameMatches({});
+        setVibeGameCurrentName(null);
+        setVibeGameOptions([]);
+    };
+
+
+    const getBackgroundClasses = (tab) => {
+        switch (tab) {
+            case 'analysis': return 'bg-gradient-to-br from-blue-50 to-indigo-100';
+            case 'comparison': return 'bg-gradient-to-br from-purple-50 to-pink-100';
+            case 'voting': return 'bg-gradient-to-br from-green-50 to-teal-100';
+            case 'games': return 'bg-gradient-to-br from-red-50 to-orange-100'; // New background for games
+            case 'message': return 'bg-gradient-to-br from-yellow-50 to-orange-100';
+            case 'recommendation': return 'bg-gradient-to-br from-red-50 to-purple-100';
+            default: return 'bg-gradient-to-br from-blue-50 to-indigo-100';
+        }
+    };
 
     return (
-        <div className="font-inter bg-gradient-to-b from-blue-50 to-indigo-100 min-h-screen p-4 sm:p-8 flex flex-col items-center">
+        <div className={`font-inter min-h-screen p-4 sm:p-8 flex flex-col items-center transition-colors duration-500 ${getBackgroundClasses(activeTab)}`}>
+            {/* Inline style for Cairo font to ensure it compiles correctly with Tailwind */}
+            <style>
+              {`
+                @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap');
+                .font-cairo-display {
+                  font-family: 'Cairo', sans-serif;
+                }
+              `}
+            </style>
+
             {tempMessage && (
                 <div id="temp-message-box" className={`fixed top-4 right-4 text-white p-3 rounded-lg shadow-lg z-50 animate-fadeInOut 
                     ${tempMessageType === 'error' ? 'bg-red-600' : (tempMessageType === 'success' ? 'bg-green-600' : 'bg-blue-600')}`}
@@ -697,27 +945,27 @@ function App() {
                     <span className="block sm:inline">وظائف حفظ البيانات (التصويت، التعليقات) **معطلة حالياً**. يرجى إعداد مشروع Firebase الخاص بكم لتفعيلها لاحقاً.</span>
                 </div>
             )}
-            {!IS_CANVAS_ENVIRONMENT && ( // Show this message ONLY if not in Canvas env
+            {!IS_CANVAS_ENVIRONMENT && (
                 <div className="bg-orange-100 border border-orange-400 text-orange-700 px-4 py-3 rounded-lg relative mb-4 w-full max-w-xl text-center shadow-md animate-fadeIn">
                     <strong className="font-bold">ملاحظة: </strong>
-                    <span className="block sm:inline">ميزات الذكاء الاصطناعي (توليد البركات والمعلومات) **معطلة حالياً** في هذا الإصدار المنشور لضمان استقرار التطبيق.</span>
+                    <span className="block sm:inline">ميزات الذكاء الاصطناعي (توليد البركات والمعلومات) **معطلة حالياً** في هذا الإصدار المنشور لضمان استقرار التطبيق. تم استبدالها بمحتوى ثابت.</span>
                 </div>
             )}
             <div className="w-full max-w-6xl bg-white rounded-xl shadow-2xl overflow-hidden mb-8 transform transition-all duration-300">
                 <header className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-6 rounded-t-xl text-center relative overflow-hidden">
                     <div className="absolute inset-0 opacity-10 bg-pattern"></div>
-                    <h1 className="text-4xl sm:text-5xl font-extrabold mb-2 leading-tight drop-shadow-lg font-['Cairo']">
+                    <h1 className="text-4xl sm:text-5xl font-extrabold mb-2 leading-tight drop-shadow-lg font-cairo-display">
                         ✨ نجم العائلة: بوابة اختيار اسم مولودكما ✨
                     </h1>
                     <p className="text-lg sm:text-xl font-light opacity-90">
                         رحلة ممتعة ومدروسة لاختيار الاسم المثالي لطفلكما يا عائلة الغزالي الكريمة.
                     </p>
                     {countdown.message ? (
-                        <div className="mt-4 text-xl font-bold text-yellow-300 animate-pulse">{countdown.message}</div>
+                        <div className="mt-4 text-xl font-bold text-yellow-300 animate-pulse font-cairo-display">{countdown.message}</div>
                     ) : (
                         <div className="mt-4 text-sm font-light opacity-80">
                             تاريخ الميلاد المتوقع: 3 يونيو 2025
-                            <div className="text-yellow-300 text-lg sm:text-xl font-bold mt-2 animate-bounce-text-once-slow">
+                            <div className="text-yellow-300 text-lg sm:text-xl font-bold mt-2 animate-bounce-text-once-slow font-cairo-display">
                                 {`${countdown.days} يوماً, ${countdown.hours} ساعة, ${countdown.minutes} دقيقة, ${countdown.seconds} ثانية`}
                             </div>
                         </div>
@@ -735,6 +983,9 @@ function App() {
                         <li className={`cursor-pointer px-4 py-2 rounded-full transition-all duration-300 ${activeTab === 'voting' ? 'bg-white text-indigo-600 shadow-lg' : 'hover:bg-indigo-500'}`} onClick={() => setActiveTab('voting')}>
                             تصويت وآراء
                         </li>
+                        <li className={`cursor-pointer px-4 py-2 rounded-full transition-all duration-300 ${activeTab === 'games' ? 'bg-white text-indigo-600 shadow-lg' : 'hover:bg-indigo-500'}`} onClick={() => setActiveTab('games')}>
+                            ألعاب مسلية
+                        </li>
                         <li className={`cursor-pointer px-4 py-2 rounded-full transition-all duration-300 ${activeTab === 'message' ? 'bg-white text-indigo-600 shadow-lg' : 'hover:bg-indigo-500'}`} onClick={() => setActiveTab('message')}>
                             رسالة للوالدين
                         </li>
@@ -747,7 +998,7 @@ function App() {
                 <main className="p-6 sm:p-8">
                     {activeTab === 'analysis' && (
                         <section className="animate-fadeIn">
-                            <h2 className="text-3xl font-bold text-center text-indigo-700 mb-8 border-b-2 border-indigo-400 pb-4">
+                            <h2 className="text-3xl font-bold text-center text-indigo-700 mb-8 border-b-2 border-indigo-400 pb-4 font-cairo-display">
                                 تحليل شامل لأسماء: <span className="text-purple-600">يامن، غوث، غياث</span>
                             </h2>
                             <p className="text-center text-gray-600 italic mb-6">
@@ -770,7 +1021,7 @@ function App() {
 
                     {activeTab === 'comparison' && (
                         <section className="animate-fadeIn">
-                            <h2 className="text-3xl font-bold text-center text-indigo-700 mb-8 border-b-2 border-indigo-400 pb-4">
+                            <h2 className="text-3xl font-bold text-center text-indigo-700 mb-8 border-b-2 border-indigo-400 pb-4 font-cairo-display">
                                 مقارنة وتقييم الأسماء
                             </h2>
                             <p className="text-center text-gray-600 italic mb-6">
@@ -778,9 +1029,9 @@ function App() {
                             </p>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {sortedComparisonData.map((nameComp, index) => (
+                                {sortedComparisonData.map((nameComp) => (
                                     <div key={nameComp.name} className="bg-white rounded-xl shadow-lg p-6 border border-purple-200 flex flex-col items-center text-center transform transition-transform duration-300 hover:scale-105 hover:shadow-2xl">
-                                        <h3 className="text-3xl font-bold text-indigo-800 mb-4">{nameComp.name}</h3>
+                                        <h3 className="text-3xl font-bold text-indigo-800 mb-4 font-cairo-display">{nameComp.name}</h3>
                                         <div className="w-full text-left space-y-3">
                                             <p className="text-lg text-gray-700 flex items-center">
                                                 <span className="text-purple-600 ml-2">📚</span> <span className="font-semibold">المعنى:</span> {nameComp.meaning}
@@ -803,7 +1054,7 @@ function App() {
                             </div>
 
                             <div className="bg-white rounded-xl shadow-lg p-6 border border-teal-200 mt-8">
-                                <h3 className="text-2xl font-bold text-teal-700 mb-4 border-b pb-2">
+                                <h3 className="text-2xl font-bold text-teal-700 mb-4 border-b pb-2 font-cairo-display">
                                     نشاط: أي اسم يوحي بأي مشاعر؟
                                 </h3>
                                 <p className="text-gray-700 mb-4">
@@ -828,7 +1079,7 @@ function App() {
                                     ))}
                                 </div>
                                 <p className="text-sm text-gray-600 italic mt-4">
-                                    (هذا النشاط لمجرد المتعة والتفكير في دلالات الأسماء.)
+                                    (هذا النشاط لمجرد المتعة والتفكير في دلالات الأسماء. يتم حفظ اختياركما محلياً.)
                                 </p>
                             </div>
                         </section>
@@ -836,7 +1087,7 @@ function App() {
 
                     {activeTab === 'voting' && (
                         <section className="animate-fadeIn">
-                            <h2 className="text-3xl font-bold text-center text-indigo-700 mb-8 border-b-2 border-indigo-400 pb-4">
+                            <h2 className="text-3xl font-bold text-center text-indigo-700 mb-8 border-b-2 border-indigo-400 pb-4 font-cairo-display">
                                 تصويت الوالدين وآراؤهم
                             </h2>
                             {currentUser && firebaseEnabled && (
@@ -851,7 +1102,7 @@ function App() {
                             )}
 
                             <div className="bg-white rounded-xl shadow-lg p-6 border border-teal-300 mb-8 text-center">
-                                <h3 className="text-2xl font-bold text-teal-700 mb-4">من يصوّت؟</h3>
+                                <h3 className="text-2xl font-bold text-teal-700 mb-4 font-cairo-display">من يصوّت؟</h3>
                                 <div className="flex flex-wrap justify-center gap-4 mb-4">
                                     <label className="flex items-center space-x-2 cursor-pointer bg-blue-100 p-3 rounded-lg hover:bg-blue-200 transition-colors shadow">
                                         <input
@@ -907,11 +1158,11 @@ function App() {
                                 </p>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10"> {/* Changed to 3 columns */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
                                 {Object.keys(nameDetails).map(name => (
                                     <div key={name} className="bg-white rounded-xl shadow-lg p-5 text-center transform transition-transform duration-300 hover:scale-105 hover:shadow-xl border border-indigo-200 flex flex-col justify-between">
                                         <div>
-                                            <h3 className="text-2xl font-bold text-indigo-800 mb-3">{name}</h3>
+                                            <h3 className="text-2xl font-bold text-indigo-800 mb-3 font-cairo-display">{name}</h3>
                                             <p className="text-gray-600 mb-4 text-sm">{nameDetails[name].meaning}</p>
                                         </div>
                                         <div>
@@ -931,7 +1182,7 @@ function App() {
                             </div>
 
                             <div className="bg-white rounded-xl shadow-lg p-6 border border-teal-200 mt-8">
-                                <h3 className="text-2xl font-bold text-teal-700 mb-4 border-b pb-2">
+                                <h3 className="text-2xl font-bold text-teal-700 mb-4 border-b pb-2 font-cairo-display">
                                     مخطط الأصوات الحالي
                                 </h3>
                                 <div className="flex flex-col space-y-4">
@@ -940,7 +1191,7 @@ function App() {
                                         const percentage = totalVotes > 0 ? (votes[name] / totalVotes) * 100 : 0;
                                         return (
                                             <div key={name} className="flex items-center">
-                                                <span className="w-24 text-right font-semibold text-gray-700">{name}:</span>
+                                                <span className="w-24 text-right font-semibold text-gray-700 font-cairo-display">{name}:</span>
                                                 <div className="flex-grow bg-gray-200 rounded-full h-8 ml-4 relative overflow-hidden">
                                                     <div
                                                         className="bg-gradient-to-r from-blue-400 to-indigo-600 h-full rounded-full transition-all duration-500 ease-out flex items-center justify-end pr-2"
@@ -966,7 +1217,7 @@ function App() {
                             </div>
 
                             <div className="bg-white rounded-xl shadow-lg p-6 border border-purple-200 mt-8">
-                                <h3 className="text-2xl font-bold text-purple-700 mb-4 border-b pb-2">
+                                <h3 className="text-2xl font-bold text-purple-700 mb-4 border-b pb-2 font-cairo-display">
                                     شاركا آراءكما
                                 </h3>
                                 <textarea
@@ -1005,23 +1256,24 @@ function App() {
                             </div>
 
                             <div className="bg-white rounded-xl shadow-lg p-6 border border-blue-200 mt-8">
-                                <h3 className="text-2xl font-bold text-blue-700 mb-4 border-b pb-2">
+                                <h3 className="text-2xl font-bold text-blue-700 mb-4 border-b pb-2 font-cairo-display">
                                     💭 رؤيتكما لاسم المستقبل:
                                 </h3>
                                 <p className="text-gray-700 mb-4">
                                     تخيلوا معنا: لو اخترتما اسماً لطفلكما، كيف تتصوران حياته المستقبلية بهذا الاسم؟ شاركا رؤيتكما:
                                 </p>
                                 <textarea
-                                    className="w-full p-3 border border-gray-300 rounded-lg mb-3 focus:ring-2 focus:ring-blue-400 outline-none resize-y min-h-[80px] disabled:opacity-50 disabled:bg-gray-100"
+                                    className="w-full p-3 border border-gray-300 rounded-lg mb-3 focus:ring-2 focus:ring-blue-400 outline-none resize-y min-h-[80px]"
                                     placeholder="أتخيل أن [الاسم] سيكون..."
                                     value={nameVibeInput}
-                                    onChange={(e) => setNameVibeInput(e.target.value)}
-                                    disabled={!firebaseEnabled}
+                                    onChange={(e) => {
+                                        setNameVibeInput(e.target.value);
+                                        localStorage.setItem('nameVibeInput', e.target.value);
+                                    }}
                                 ></textarea>
                                 <button
                                     onClick={() => showTemporaryMessage("شكراً لمشاركتكما رؤيتكما المستقبلية الملهمة!", 'success')}
-                                    className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    disabled={!firebaseEnabled}
+                                    className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300"
                                 >
                                     شارك الرؤية
                                 </button>
@@ -1029,43 +1281,186 @@ function App() {
                         </section>
                     )}
 
+                    {activeTab === 'games' && (
+                        <section className="animate-fadeIn">
+                            <h2 className="text-3xl font-bold text-center text-orange-700 mb-8 border-b-2 border-orange-400 pb-4 font-cairo-display">
+                                ألعاب مسلية لمساعدتكما في الاختيار!
+                            </h2>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                {/* Name Quiz Game Card */}
+                                <div className="bg-white rounded-xl shadow-lg p-6 border border-red-200 text-center flex flex-col justify-between items-center">
+                                    <h3 className="text-2xl font-bold text-red-700 mb-4 font-cairo-display">
+                                        اختبار الاسم المثالي
+                                    </h3>
+                                    <p className="text-gray-700 mb-4">
+                                        أجيبي على أسئلة سريعة لنساعدكما في تحديد الاسم الأنسب لطفلكما بناءً على تفضيلاتكما!
+                                    </p>
+                                    {!quizStarted && (
+                                        <button
+                                            onClick={startQuiz}
+                                            className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-red-300"
+                                        >
+                                            ابدأ الاختبار!
+                                        </button>
+                                    )}
+
+                                    {quizStarted && quizResult === null && (
+                                        <div className="w-full mt-4 animate-fadeInUp">
+                                            <p className="text-lg font-semibold text-gray-800 mb-4">
+                                                السؤال {currentQuizQuestionIndex + 1} من {quizQuestions.length}:
+                                            </p>
+                                            <h4 className="text-xl font-bold text-indigo-700 mb-6 font-cairo-display">
+                                                {quizQuestions[currentQuizQuestionIndex].question}
+                                            </h4>
+                                            <div className="flex flex-col space-y-3">
+                                                {quizQuestions[currentQuizQuestionIndex].options.map((option, idx) => (
+                                                    <button
+                                                        key={idx}
+                                                        onClick={() => handleQuizAnswer(option.scores)}
+                                                        className="w-full bg-blue-100 text-blue-800 py-3 px-4 rounded-lg hover:bg-blue-200 transition-colors shadow-sm font-semibold"
+                                                    >
+                                                        {option.text}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {quizResult && (
+                                        <div className="w-full mt-4 bg-green-50 p-6 rounded-lg border border-green-300 animate-fadeIn">
+                                            <h4 className="text-2xl font-bold text-green-700 mb-4 font-cairo-display">
+                                                نتائج الاختبار!
+                                            </h4>
+                                            <p className="text-lg text-gray-800 mb-4">
+                                                بناءً على إجاباتكما، الاسم/الأسماء الأكثر توافقاً هو/هي:
+                                            </p>
+                                            <ul className="text-xl font-bold text-indigo-700 space-y-2">
+                                                {quizResult.map((name, index) => (
+                                                    <li key={index}>✨ {name} ✨</li>
+                                                ))}
+                                            </ul>
+                                            <button
+                                                onClick={resetQuiz}
+                                                className="mt-6 bg-purple-500 text-white py-2 px-5 rounded-full hover:bg-purple-600 transition-colors shadow-md"
+                                            >
+                                                إعادة الاختبار
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Name Vibe Matching Game Card */}
+                                <div className="bg-white rounded-xl shadow-lg p-6 border border-blue-200 text-center flex flex-col justify-between items-center">
+                                    <h3 className="text-2xl font-bold text-blue-700 mb-4 font-cairo-display">
+                                        لعبة مطابقة الإحساس بالاسم
+                                    </h3>
+                                    <p className="text-gray-700 mb-4">
+                                        هل يمكنكما مطابقة الصفة الصحيحة لكل اسم؟ اختبروا معرفتكم!
+                                    </p>
+                                    {!vibeGameStarted && (
+                                        <button
+                                            onClick={startVibeGame}
+                                            className="bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300"
+                                        >
+                                            ابدأ اللعبة!
+                                        </button>
+                                    )}
+
+                                    {vibeGameStarted && vibeGameCurrentName && (
+                                        <div className="w-full mt-4 animate-fadeInUp">
+                                            <p className="text-lg font-semibold text-gray-800 mb-2">
+                                                النتيجة: {vibeGameScore} / {Object.keys(vibeGameMatches).length}
+                                            </p>
+                                            <h4 className="text-3xl font-bold text-indigo-700 mb-6 font-cairo-display">
+                                                {vibeGameCurrentName}
+                                            </h4>
+                                            <p className="text-gray-600 mb-4">اختر الصفة التي تناسب الاسم:</p>
+                                            <div className="flex flex-wrap justify-center gap-3">
+                                                {vibeGameOptions.map((vibe, idx) => (
+                                                    <button
+                                                        key={idx}
+                                                        onClick={() => handleVibeMatch(vibe)}
+                                                        className="bg-purple-100 text-purple-800 py-2 px-4 rounded-full text-lg font-semibold hover:bg-purple-200 transition-colors shadow-sm"
+                                                    >
+                                                        {vibe}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {vibeGameStarted && !vibeGameCurrentName && (
+                                        <div className="w-full mt-4 bg-green-50 p-6 rounded-lg border border-green-300 animate-fadeIn">
+                                            <h4 className="text-2xl font-bold text-green-700 mb-4 font-cairo-display">
+                                                انتهت اللعبة!
+                                            </h4>
+                                            <p className="text-lg text-gray-800 mb-4">
+                                                أحرزتما: <span className="text-blue-600 font-bold text-3xl">{vibeGameScore}</span> من {vibeGameNames.length}
+                                            </p>
+                                            <div className="text-left text-gray-700 mt-4">
+                                                <h5 className="font-semibold text-purple-700 mb-2 font-cairo-display">ملخص الإجابات:</h5>
+                                                {Object.keys(vibeGameMatches).map(name => (
+                                                    <p key={name} className="mb-1">
+                                                        <span className="font-bold text-indigo-600">{name}:</span> اخترتما
+                                                        <span className={`font-semibold ${vibeDefinitions[name].includes(vibeGameMatches[name][0]) ? 'text-green-600' : 'text-red-600'}`}>
+                                                            {" " + vibeGameMatches[name][0]}
+                                                        </span>. الصحيح هو
+                                                        <span className="font-semibold text-green-600">
+                                                            {" " + vibeDefinitions[name].join(', ')}
+                                                        </span>.
+                                                    </p>
+                                                ))}
+                                            </div>
+                                            <button
+                                                onClick={resetVibeGame}
+                                                className="mt-6 bg-purple-500 text-white py-2 px-5 rounded-full hover:bg-purple-600 transition-colors shadow-md"
+                                            >
+                                                العب مرة أخرى
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </section>
+                    )}
+
                     {activeTab === 'message' && (
                         <section className="animate-fadeIn">
-                            <h2 className="text-3xl font-bold text-center text-indigo-700 mb-8 border-b-2 border-indigo-400 pb-4">
+                            <h2 className="text-3xl font-bold text-center text-indigo-700 mb-8 border-b-2 border-indigo-400 pb-4 font-cairo-display">
                                 رسالة إلى الوالدين العزيزين محمد وخلود الغزالي
                             </h2>
                             <div className="bg-white p-6 rounded-lg shadow-lg border border-teal-200">
-                                <h3 className="text-2xl font-bold text-teal-700 mb-4">أ. تمهيد علمي: قوة الاسم وتأثيره</h3>
+                                <h3 className="text-2xl font-bold text-teal-700 mb-4 font-cairo-display">أ. تمهيد علمي: قوة الاسم وتأثيره</h3>
                                 <p className="text-gray-700 leading-relaxed mb-6">
                                     يا محمد وخلود، إنّ اختيار اسم مولودكما ليس مجرد قرار عابر، بل هو استثمار في هويته المستقبلية. تشير الدراسات في علم النفس الاجتماعي وعلم الدلالة اللغوية إلى أن الاسم لا يؤثر فقط على نظرة الآخرين للفرد، بل يلعب دوراً محورياً في تشكيل مفهوم الطفل لذاته، وثقته بنفسه، وحتى مساره الاجتماعي والمهني. الاسم هو أول ما يختبره الطفل من اللغة، وهو البوابة التي يُعرّف بها عن نفسه للعالم. لذلك، فإن اختيار اسم يحمل دلالات إيجابية، ويسهل نطقه، ويتوافق مع القيم الثقافية والدينية، يمنح طفلكما العزيز أساساً قوياً للنمو والازدهار. وقد قمنا بتحليل عميق لهذه الأسماء ليمنحكما نظرة شاملة.
                                 </p>
 
-                                <h3 className="text-2xl font-bold text-teal-700 mb-4">ب. جدول ترجيح موضوعي: مقارنة شاملة</h3>
+                                <h3 className="text-2xl font-bold text-teal-700 mb-4 font-cairo-display">ب. جدول ترجيح موضوعي: مقارنة شاملة</h3>
                                 <div className="overflow-x-auto rounded-lg shadow-md mb-6 border border-gray-200">
                                     <table className="min-w-full bg-white">
                                         <thead className="bg-teal-100 text-teal-800">
                                             <tr>
-                                                <th className="py-3 px-4 border-b border-gray-200 text-right">الاسم</th>
-                                                <th className="py-3 px-4 border-b border-gray-200 text-right">نقاط القوة الرئيسية</th>
-                                                <th className="py-3 px-4 border-b border-gray-200 text-right">اعتبارات هامة</th>
-                                                <th className="py-3 px-4 border-b border-gray-200 text-center">التقييم الكلي</th>
+                                                <th className="py-3 px-4 border-b border-gray-200 text-right font-cairo-display">الاسم</th>
+                                                <th className="py-3 px-4 border-b border-gray-200 text-right font-cairo-display">نقاط القوة الرئيسية</th>
+                                                <th className="py-3 px-4 border-b border-gray-200 text-right font-cairo-display">اعتبارات هامة</th>
+                                                <th className="py-3 px-4 border-b border-gray-200 text-center font-cairo-display">التقييم الكلي</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             <tr className="bg-gray-50 hover:bg-teal-50">
-                                                <td className="py-3 px-4 border-b border-gray-200 font-semibold text-teal-700">يامن</td>
+                                                <td className="py-3 px-4 border-b border-gray-200 font-semibold text-teal-700 font-cairo-display">يامن</td>
                                                 <td className="py-3 px-4 border-b border-gray-200 text-gray-700">دلالة البركة والخير، سهولة النطق، قبول واسع، توافق ممتاز مع اللقب.</td>
                                                 <td className="py-3 px-4 border-b border-gray-200 text-gray-700">اسم شائع ولكنه لا يفقد جاذبيته.</td>
                                                 <td className="py-3 px-4 border-b border-gray-200 text-center text-xl font-bold text-blue-600">ممتاز (9.5)</td>
                                             </tr>
                                             <tr className="bg-white hover:bg-teal-50">
-                                                <td className="py-3 px-4 border-b border-gray-200 font-semibold text-teal-700">غوث</td>
+                                                <td className="py-3 px-4 border-b border-gray-200 font-semibold text-teal-700 font-cairo-display">غوث</td>
                                                 <td className="py-3 px-4 border-b border-gray-200 text-gray-700">قوة المعنى (إغاثة، نجدة)، تميز الاسم.</td>
                                                 <td className="py-3 px-4 border-b border-gray-200 text-gray-700">نادر الاستخدام كاسم شخصي، قد يواجه صعوبة في النطق لغير الناطقين بالعربية.</td>
                                                 <td className="py-3 px-4 border-b border-gray-200 text-center text-xl font-bold text-orange-600">جيد (8.0)</td>
                                             </tr>
                                             <tr className="bg-gray-50 hover:bg-teal-50">
-                                                <td className="py-3 px-4 border-b border-gray-200 font-semibold text-teal-700">غياث</td>
+                                                <td className="py-3 px-4 border-b border-gray-200 font-semibold text-teal-700 font-cairo-display">غياث</td>
                                                 <td className="py-3 px-4 border-b border-gray-200 text-gray-700">قوة المعنى (إغاثة سخية)، مقبول وشائع، توافق جيد مع اللقب.</td>
                                                 <td className="py-3 px-4 border-b border-gray-200 text-gray-700">أقل شهرة من "يامن".</td>
                                                 <td className="py-3 px-4 border-b border-gray-200 text-center text-xl font-bold text-purple-600">جيد جداً (9.0)</td>
@@ -1074,48 +1469,59 @@ function App() {
                                     </table>
                                 </div>
 
-                                <h3 className="text-2xl font-bold text-teal-700 mb-4 mt-8">دليل تربوي تطبيقي متكامل للاسمين المقترحين:</h3>
+                                <h3 className="text-2xl font-bold text-teal-700 mb-4 mt-8 font-cairo-display">دليل تربوي تطبيقي متكامل للاسمين المقترحين:</h3>
                                 <p className="text-gray-700 leading-relaxed mb-4">
                                     لتسهيل رحلتكما الأبوية، نقدم لكما دليلاً عملياً لكيفية تعزيز الصفات الإيجابية المرتبطة بكل من اسمي "يامن" و"غياث". تذكروا أن الاسم هو جزء من الهوية، والتربية هي رحلة مستمرة لغرس القيم.
                                 </p>
 
                                 <div className="bg-blue-50 p-5 rounded-lg shadow-inner mb-6 border border-blue-200">
-                                    <h4 className="text-xl font-bold text-blue-700 mb-3 flex items-center">
+                                    <h4 className="text-xl font-bold text-blue-700 mb-3 flex items-center font-cairo-display">
                                         <span className="ml-2">🌟</span> إذا وقع اختياركما على اسم <span className="text-indigo-800 mr-1">"يامن"</span>:
                                     </h4>
                                     <p className="text-gray-700 leading-relaxed mb-4">
                                         "يامن" يعني **المبارك، الميمون، وكثير اليمن والبركة**. هذا الاسم يعكس طاقة إيجابية عالية، ويُوحي بالرخاء والتوفيق في الحياة. إنه اسم سهل النطق، لطيف على الأذن، ويتناغم بشكل طبيعي مع لقب "الغزالي". اختيار "يامن" قد يُسهم في بناء شخصية متفائلة، محظوظة، ومحبة للعطاء، تسعى دائماً لنشر الخير واليُمن أينما حلّت.
                                     </p>
-                                    <p className="font-semibold text-indigo-600 mb-2">توجيهات تربوية لـ "يامن":</p>
+                                    <p className="font-semibold text-indigo-600 mb-2 font-cairo-display">توجيهات تربوية لـ "يامن":</p>
                                     <ul className="list-disc list-inside text-gray-700 leading-relaxed space-y-2">
                                         <li><span className="font-semibold text-indigo-600">غرس التفاؤل والإيجابية:</span> شجّعا يامن على رؤية الجانب المشرق في الحياة. رويا له قصصاً عن الصبر والأمل، وعلّماه أن البركة والخير يأتيان بالاجتهاد والتوكل على الله.</li>
                                         <li><span className="font-semibold text-indigo-600">تعزيز الامتنان:</span> علّماه قيمة الشكر والامتنان للنعم الصغيرة والكبيرة في حياته. هذا يُرسخ فيه شعوراً بالرضا والبركة.</li>
                                         <li><span className="font-semibold text-indigo-600">تنمية حب العطاء:</span> اربطا اسمه بفعل الخير والبركة. شجّعاه على مساعدة الآخرين ومشاركتهم ما لديه، ليعيش معنى "اليُمن" في عطائه.</li>
                                         <li><span className="font-semibold text-indigo-600">بناء الثقة بالنفس:</span> امدحا جهوده وإنجازاته، وازرعا فيه الثقة بأنه قادر على تحقيق النجاحات وجلب الخير أينما حل.</li>
                                     </ul>
-                                    <h5 className="font-semibold text-blue-700 mt-4 mb-2">نشاط تفاعلي لـ "يامن":</h5>
+                                    <h5 className="font-semibold text-blue-700 mt-4 mb-2 font-cairo-display">نشاط تفاعلي لـ "يامن":</h5>
                                     <p className="text-gray-700 mb-3">
                                         **لعبة "صندوق البركات"**: خصصا صندوقاً جميلاً يجمع فيه يامن (عندما يكبر قليلاً) كل الأشياء الصغيرة التي يشعر بالامتنان لوجودها كل أسبوع (مثلاً: رسمة جميلة، حجر مميز، ورقة شجر ملونة). في نهاية الأسبوع، افتحا الصندوق وتكلما معه عن هذه "البركات" البسيطة في حياته.
                                     </p>
                                 </div>
 
                                 <div className="bg-purple-50 p-5 rounded-lg shadow-inner border border-purple-200">
-                                    <h4 className="text-xl font-bold text-purple-700 mb-3 flex items-center">
+                                    <h4 className="text-xl font-bold text-purple-700 mb-3 flex items-center font-cairo-display">
                                         <span className="ml-2">💪</span> إذا وقع اختياركما على اسم <span className="text-indigo-800 mr-1">"غياث"</span>:
                                     </h4>
                                     <p className="text-gray-700 leading-relaxed mb-4">
                                         "غياث" يعني **الناصر، المنجد، والمساعد الذي يُغاث به الناس**. إنه صيغة مبالغة من "غوث"، مما يدل على كثرة الإغاثة والعون. هذا الاسم يرمز إلى القوة والعطاء الفعال، ويُشير إلى شخصية مبادرة وقادرة على إحداث فرق إيجابي في حياة الآخرين. يتناسب "غياث" أيضاً بشكل ممتاز مع لقب "الغزالي" وله رنين قوي وجذاب.
                                     </p>
-                                    <p className="font-semibold text-indigo-600 mb-2">توجيهات تربوية لـ "غياث":</p>
+                                    <p className="font-semibold text-indigo-600 mb-2 font-cairo-display">توجيهات تربوية لـ "غياث":</p>
                                     <ul className="list-disc list-inside text-gray-700 leading-relaxed space-y-2">
                                         <li><span className="font-semibold text-purple-600">تنمية حس المسؤولية:</span> علّماه مبكراً أهمية تحمل المسؤولية تجاه نفسه وتجاه الآخرين. كلفاه بمهام بسيطة تتناسب مع عمره.</li>
                                         <li><span className="font-semibold text-purple-600">تشجيع المبادرة والعون:</span> درّباه على أن يكون سبّاقاً في مساعدة من يحتاج، وأن لا يتردد في مد يد العون. يمكن أن تشاركا في أعمال تطوعية صغيرة كعائلة.</li>
                                         <li><span className="font-semibold text-purple-600">غرس الشجاعة والنخوة:</span> رويا له القصص التي تُعزز الشجاعة في مواجهة التحديات والدفاع عن الحق والضعفاء.</li>
                                         <li><span className="font-semibold text-purple-600">تعليم القيادة:</span> شجّعاه على أخذ زمام المبادرة في الأنشطة الجماعية، وتنمية مهارات القيادة لديه من خلال الألعاب التي تتطلب التخطيط والتوجيه.</li>
                                     </ul>
-                                    <h5 className="font-semibold text-purple-700 mt-4 mb-2">نشاط تفاعلي لـ "غياث":</h5>
+                                    <h5 className="font-semibold text-purple-700 mt-4 mb-2 font-cairo-display">نشاط تفاعلي لـ "غياث":</h5>
                                     <p className="text-gray-700 mb-3">
                                         **"بطاقات الإغاثة"**: حضرا بطاقات عليها مواقف بسيطة يحتاج فيها شخص للمساعدة (مثلاً: صديق سقط، أو دمية تحتاج إصلاحاً). ودعا غياث لاقتراح حلول أو طرق عملية للمساعدة. هذا يعزز لديه التفكير المبادِر.
+                                    </p>
+                                </div>
+                                <div className="bg-yellow-50 p-5 rounded-lg shadow-inner mb-6 border border-yellow-200 mt-6">
+                                    <h4 className="text-xl font-bold text-yellow-700 mb-3 flex items-center font-cairo-display">
+                                        <span className="ml-2">🌟</span> رؤيتنا العائلية لمستقبل مولودنا:
+                                    </h4>
+                                    <p className="text-gray-700 leading-relaxed mb-4">
+                                        نحن، عائلة الغزالي، نرى في مولودنا القادم نوراً جديداً ينير حياتنا وحياة من حوله. نتمنى أن يكون اسماً يحمل البركة واليُمن، وأن يكون داعماً ومساعداً لمن حوله. نتصور طفلنا هذا وهو ينمو ليصبح فرداً قوياً، محباً، قادراً على ترك بصمة إيجابية في العالم، متفائلاً يرى الخير في كل شيء، ومسؤولاً ينهض لتقديم العون عند الحاجة. نأمل أن يعيش حياته بقلب مليء بالعطاء، وأن يكون مصدر فخر لنا ولأمته.
+                                    </p>
+                                    <p className="text-sm text-gray-600 italic mt-4">
+                                        (هذه رؤيتنا التي توجه اختياراتنا وطموحاتنا لمولودنا.)
                                     </p>
                                 </div>
 
@@ -1151,80 +1557,9 @@ function App() {
                     </button>
                 </footer>
             </div>
-            <style>{`
-                @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&family=Inter:wght@300;400;600;700;800&display=swap');
-
-                .font-inter {
-                    font-family: 'Inter', sans-serif;
-                }
-                .font-['Cairo'] {
-                    font-family: 'Cairo', sans-serif;
-                }
-
-                .bg-pattern {
-                    background-image: url('data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.1"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0 20v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM6 34v-4h-2v4H0v2h4v4h2v-4h4v-2H6zm0 20v-4h-2v4H0v2h4v4h2v-4h4v-2H6zM36 4v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM6 4v-4h-2v4H0v2h4v4h2v-4h4v-2H6zM48 16v-2h-4v2h-2v4h2v2h4v-2h2v-4h-2zM48 36v-2h-4v2h-2v4h2v2h4v-2h2v-4h-2zM48 56v-2h-4v2h-2v4h2v2h4v-2h2v-4h-2zM12 16v-2h-4v2h-2v4h2v2h4v-2h2v-4h-2zM12 36v-2h-4v2h-2v4h2v2h4v-2h2v-4h-2zM12 56v-2h-4v2h-2v4h2v2h4v-2h2v-4h-2zM0 16v-2h-4v2h-2v4h2v2h4v-2h2v-4H0zM0 36v-2h-4v2h-2v4h2v2h4v-2h2v-4H0zM0 56v-2h-4v2h-2v4h2v2h4v-2h2v-4H0zM24 0v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0 20v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0 40v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM30 16v-2h-4v2h-2v4h2v2h4v-2h2v-4h-2zM30 36v-2h-4v2h-2v4h2v2h4v-2h2v-4h-2zM30 56v-2h-4v2h-2v4h2v2h4v-2h2v-4h-2zM42 0v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0 20v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0 40v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zM18 0v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0 20v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0 40v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E');
-                    background-size: 30px 30px;
-                    animation: pan 60s linear infinite;
-                }
-                @keyframes pan {
-                    0% { background-position: 0% 0%; }
-                    100% { background-position: 100% 100%; }
-                }
-
-                .animate-fadeIn {
-                    animation: fadeIn 0.5s ease-out;
-                }
-                .animate-fadeInUp {
-                    animation: fadeInUp 0.5s ease-out;
-                }
-                @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                }
-                @keyframes fadeInUp {
-                    from { opacity: 0; transform: translateY(20px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-
-                .animate-pulse-fade {
-                    animation: pulseFade 2s infinite alternate;
-                }
-                @keyframes pulseFade {
-                    0% { opacity: 0.7; }
-                    100% { opacity: 1; }
-                }
-                
-                .animate-bounce-text-once {
-                    animation: bounceText 0.8s ease-out 1;
-                }
-                @keyframes bounceText {
-                    0%, 100% { transform: translateY(0); }
-                    25% { transform: translateY(-8px); }
-                    50% { transform: translateY(0); }
-                    75% { transform: translateY(-4px); }
-                }
-
-                .animate-bounce-text-once-slow {
-                    animation: bounceTextSlow 2s ease-out infinite;
-                }
-                @keyframes bounceTextSlow {
-                    0%, 100% { transform: translateY(0); }
-                    25% { transform: translateY(-5px); }
-                    50% { transform: translateY(0); }
-                    75% { transform: translateY(-2px); }
-                }
-
-                .animate-fadeInOut {
-                    animation: fadeInOut 3s forwards;
-                }
-
-                @keyframes fadeInOut {
-                    0% { opacity: 0; transform: translateX(20px); }
-                    10% { opacity: 1; transform: translateX(0); }
-                    90% { opacity: 1; transform: translateX(0); }
-                    100% { opacity: 0; transform: translateX(20px); }
-                }
-            `}</style>
+            {/* Tone.js CDN script included directly for global access in the React component */}
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+            {/* Tailwind CSS CDN */}
             <script src="https://cdn.tailwindcss.com"></script>
         </div>
     );
