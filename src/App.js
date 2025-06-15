@@ -161,7 +161,7 @@ function App() {
     const initialSignInAttempted = useRef(false);
 
     // Countdown state
-    const targetDate = new Date('2025-06-03T00:00:00'); // June 3, 2025
+    const targetDate = React.useMemo(() => new Date('2025-06-03T00:00:00'), []); // June 3, 2025
     const [countdown, setCountdown] = useState({});
 
     useEffect(() => {
@@ -237,8 +237,7 @@ function App() {
         });
 
         return () => unsubscribeAuth();
-    }, [firebaseEnabled]); // Recreate if firebaseEnabled changes
-
+    }, []); // لن يتغير firebaseEnabled بعد التهيئة الأولية، لذا فهو ليس تابعاً فعلياً يعيد إنشاء الدالة
     useEffect(() => {
         setupFirebaseAuth();
     }, [setupFirebaseAuth]); // Run when setupFirebaseAuth changes
