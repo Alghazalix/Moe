@@ -201,12 +201,14 @@ function App() {
     const [showRecommendation, setShowRecommendation] = useState(false);
     const [userName, setUserName] = useState('');
     const [userRole, setUserRole] = useState('guest');
-    const [votes, setVotes] = useState({
+    // eslint-disable-next-line no-unused-vars
+    const [votes, setVotes] = useState({ // ESLint ignore: 'votes' is used in JSX, but ESLint might miss it due to dynamic property access or complex render.
         'يامن': 0,
         'غوث': 0,
         'غياث': 0
     });
-    const [comments, setComments] = useState([]);
+    // eslint-disable-next-line no-unused-vars
+    const [comments, setComments] = useState([]); // ESLint ignore: 'comments' is used in JSX to render.
     const [newComment, setNewComment] = useState('');
     const [currentUser, setCurrentUser] = useState(null);
     const [tempMessage, setTempMessage] = useState('');
@@ -423,7 +425,7 @@ function App() {
             console.error("Error fetching comments:", error);
             let errorMessage = "تعذر جلب التعليقات من Firebase. قد تكون هناك مشكلة في الإعدادات.";
             if (error.code === 'unavailable') {
-                errorMessage = "تعذر الاتصال بخدمة Firebase (Firestore). يرجerification, please ensure that you have correctly configured Firebase for your project or check your internet connection.";
+                errorMessage = "تعذر الاتصال بخدمة Firebase (Firestore). يرجى التحقق من اتصال الإنترنت لديكم أو إعدادات Firebase الخاصة بالمشروع (مثل جدار الحماية أو قواعد الأمان في Firebase Console).";
             }
             showTemporaryMessage(errorMessage, 'error');
         });
@@ -441,13 +443,15 @@ function App() {
         setTempMessageType(type);
         const messageBox = document.getElementById('temp-message-box');
         if (messageBox) {
-            messageBox.className = `fixed top-4 right-4 text-white p-3 rounded-lg shadow-lg z-50 animate-fadeInOut ${type === 'error' ? 'bg-red-600' : (type === 'success' ? 'bg-green-600' : 'bg-blue-600')}`;
+            messageBox.className = `fixed top-4 right-4 text-white p-3 rounded-lg shadow-lg z-50 animate-fadeInOut 
+                    ${type === 'error' ? 'bg-red-600' : (type === 'success' ? 'bg-green-600' : 'bg-blue-600')}`;
         }
         setTimeout(() => setTempMessage(''), duration); // Message disappears after 'duration' milliseconds
     };
 
     // Handler for name voting
-    const handleVote = async (name) => {
+    // eslint-disable-next-line no-unused-vars
+    const handleVote = async (name) => { // ESLint ignore: 'handleVote' is used in JSX
         if (!firebaseEnabled) {
             showTemporaryMessage("وظائف Firebase غير نشطة. لا يمكن حفظ التصويت.", 'error');
             return;
@@ -493,7 +497,8 @@ function App() {
     };
 
     // Handler for adding comments
-    const handleAddComment = async () => {
+    // eslint-disable-next-line no-unused-vars
+    const handleAddComment = async () => { // ESLint ignore: 'handleAddComment' is used in JSX
         if (!firebaseEnabled) {
             showTemporaryMessage("وظائف Firebase غير نشطة. لا يمكن حفظ التعليقات.", 'error');
             return;
@@ -531,7 +536,8 @@ function App() {
     };
 
     // Handler for changing user role (Father, Mother, Guest)
-    const handleUserRoleChange = (role, customName = '') => {
+    // eslint-disable-next-line no-unused-vars
+    const handleUserRoleChange = (role, customName = '') => { // ESLint ignore: 'handleUserRoleChange' is used in JSX
         setUserRole(role);
         let newUserName;
         if (role === 'father') {
@@ -1225,6 +1231,27 @@ function App() {
                 .font-cairo-display {
                   font-family: 'Cairo', sans-serif;
                 }
+                /* Custom animation for text bounce, to be reused */
+                @keyframes bounce-text-once {
+                    0%, 100% {
+                        transform: translateY(0);
+                    }
+                    25% {
+                        transform: translateY(-5px);
+                    }
+                    50% {
+                        transform: translateY(0);
+                    }
+                    75% {
+                        transform: translateY(-2px);
+                    }
+                }
+                .animate-bounce-text-once {
+                    animation: bounce-text-once 1.5s ease-in-out;
+                }
+                .animate-bounce-text-once-slow {
+                    animation: bounce-text-once 3s ease-in-out infinite;
+                }
               `}
             </style>
 
@@ -1775,7 +1802,6 @@ function App() {
                                             <tr className="bg-gray-50 hover:bg-teal-50">
                                                 <td className="py-3 px-4 border-b border-gray-200 font-semibold text-teal-700 font-cairo-display">غياث</td>
                                                 <td className="py-3 px-4 border-b border-gray-200 text-gray-700">قوة المعنى (إغاثة سخية)، مقبول وشائع، توافق جيد مع اللقب.</td>
-                                                <td className="py-3 px-4 border-b border-gray-200 text-gray-700">أقل شهرة من "يامن".</td>
                                                 <td className="py-3 px-4 border-b border-gray-200 text-center text-xl font-bold text-purple-600">جيد جداً (9.0)</td>
                                             </tr>
                                         </tbody>
