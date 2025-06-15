@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+// ESLint ignore for unused imports in a development/mocking context
 // eslint-disable-next-line no-unused-vars
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot } from 'firebase/firestore';
 import { initializeApp } from 'firebase/app';
 
-// Define if the app is running in the Canvas environment
+// Define if the app is running in the Canvas environment (local development vs. Netlify deployment)
 const IS_CANVAS_ENVIRONMENT = typeof window.__app_id !== 'undefined';
 
 // Determine the appId for Firestore paths.
@@ -12,7 +13,8 @@ const IS_CANVAS_ENVIRONMENT = typeof window.__app_id !== 'undefined';
 const appId = IS_CANVAS_ENVIRONMENT ? window.__app_id : "alghazali-family-app-deploy";
 
 // Determine Firebase configuration.
-// This block intelligently chooses between Canvas provided config or user's environment variables.
+// This block intelligently chooses between Canvas-provided config (for Canvas preview)
+// or user's hardcoded credentials (for Netlify deployment where env vars might not be direct).
 const firebaseConfig = IS_CANVAS_ENVIRONMENT
     ? JSON.parse(window.__firebase_config)
     : {
@@ -23,15 +25,15 @@ const firebaseConfig = IS_CANVAS_ENVIRONMENT
         storageBucket: "alghazalifamilyapp.firebasestorage.app",
         messagingSenderId: "211907541440",
         appId: "1:211907541440:web:82c313f5f17d4e91c07025",
-        measurementId: "G-VJLS5W68E7" // This is a new ID provided by the user
+        measurementId: "G-VJLS5W68E7" // This ID is primarily for Google Analytics, not used in this app's logic.
     };
 
 // Initialize Firebase services conditionally
 let firestoreDbInstance;
 let firebaseAuthInstance;
-let firebaseEnabled = false;
+let firebaseEnabled = false; // Flag to track if Firebase was successfully initialized
 
-// Check if enough config is present to actually initialize Firebase
+// Check if enough configuration is present to actually initialize Firebase
 const shouldInitializeFirebase = IS_CANVAS_ENVIRONMENT || (
     firebaseConfig.projectId && firebaseConfig.apiKey && firebaseConfig.authDomain
 );
@@ -45,14 +47,46 @@ if (shouldInitializeFirebase) {
         console.log("Firebase successfully initialized with provided credentials.");
     } catch (e) {
         console.error("Firebase initialization failed, mocking services:", e);
-        firebaseEnabled = false;
+        firebaseEnabled = false; // Set flag to false if initialization fails
     }
 } else {
     console.warn("Firebase configuration is incomplete for external deployment. Firebase functionality (votes, comments) will be mocked.");
 }
 
-// Pre-defined static content for "AI-like" generation
-// These are used when actual AI generation is disabled (e.g., in Netlify builds).
+// Mock Firebase services if real Firebase was not initialized or failed
+// This ensures the app can still run without full Firebase functionality.
+if (!firebaseEnabled) {
+    firestoreDbInstance = {
+        collection: () => ({ addDoc: () => Promise.resolve() }), // Mock addDoc
+        doc: () => ({}), // Mock doc
+        getDoc: () => Promise.resolve({ exists: () => false, data: () => ({}) }), // Mock getDoc
+        setDoc: () => Promise.resolve(), // Mock setDoc
+        onSnapshot: (ref, callback) => { // Mock onSnapshot for data fetching
+            console.log("Firestore onSnapshot mocked: No real-time updates for this instance.");
+            callback({ forEach: () => {}, docs: [] }); // Provide empty snapshot
+            return () => console.log("Firestore onSnapshot mocked: Unsubscribed."); // Mock unsubscribe
+        },
+        query: (ref) => ref // Mock query
+    };
+    firebaseAuthInstance = {
+        onAuthStateChanged: (callback) => { // Mock onAuthStateChanged for user auth status
+            console.log("Firebase Auth onAuthStateChanged mocked.");
+            callback({ uid: 'mock-user-id', isAnonymous: true }); // Provide a mock anonymous user
+            return () => console.log("Firebase Auth onAuthStateChanged mocked: Unsubscribed.");
+        },
+        signInAnonymously: () => { // Mock anonymous sign-in
+            console.log("Firebase Auth signInAnonymously mocked.");
+            return Promise.resolve({ user: { uid: 'mock-user-id', isAnonymous: true } });
+        },
+        signInWithCustomToken: () => { // Mock custom token sign-in (for Canvas)
+            console.log("Firebase Auth signInWithCustomToken mocked.");
+            return Promise.resolve({ user: { uid: 'mock-canvas-user', isAnonymous: false } });
+        }
+    };
+}
+
+// Pre-defined static content for "AI-like" generation (used when real AI is not integrated).
+// This ensures the app always has content for these features.
 const staticBlessings = {
     'يامن': "تبارك الرحمن يامن، يا قرة العين ونور الدرب، لتكن حياتك مليئة باليُمن والبركات، تسعد بها القلوب وتُبهج الأرواح. اللهم اجعله مباركاً أينما كان، وسعيداً أينما حلّ، وقرة عين لوالديه.",
     'غوث': "يا غوثاً للضعيف ونصيراً للمظلوم، لتكن حياتك منارة للعون والسند، تملؤها الشجاعة والنخوة. نسأل الله أن يجعلك دائماً سبباً في إغاثة المحتاج، ومصدراً للقوة والعطاء، وسنداً لعائلتك.",
@@ -71,13 +105,98 @@ const staticSimilarNames = {
     'غياث': "1. نصير: يعني الداعم والمعين بقوة.\n2. فداء: يعني التضحية والعطاء من أجل الآخرين.\n3. أويس: اسم عربي جميل يحمل معنى الذئب الصغير، ويرتبط بالشجاعة والقوة.",
 };
 
+// New static content for name poems/rhymes
+const staticNamePoems = {
+    'يامن': "يامن اسمٌ يجلبُ الخيرَ واليُمنْ،\nفي كلِ خطوةٍ تزهو بك الأوطانْ.\nيا نورَ العينِ، يا بسمةَ الزمنْ،\nتزدادُ فيكَ المحاسنُ والألوانْ.",
+    'غوث': "يا غوثَ القلوبِ، يا درعَ السندْ،\nفي الشدائدِ أنتَ العونُ والمدَدْ.\nبالشجاعةِ تزهو، لا تخشى أحدْ،\nيا رمزَ القوةِ، يا ناصرَ الأبدْ.",
+    'غياث': "غياثٌ أنتَ، كالمطرِ إذا همى،\nتُحيي النفوسَ، تُزيلُ ما تأزما.\nبالعطاءِ تُعرفُ، وبالخيرِ قد سَمَا،\nيا نجمَ العُلا، يا منْ فيكَ الكَرَمَا."
+};
 
-// Main list of names used in the app, 'الغوث' is intentionally excluded from this list
-// as per previous requirements, it's used for analysis but not for new selections.
+// New static content for numerology/keywords/future vision
+const staticNumerology = {
+    'يامن': { value: 7, trait: 'الاستقرار والحكمة، يميل إلى التفكير العميق والسعي نحو التوازن.' },
+    'غوث': { value: 5, trait: 'المغامرة والحرية، يحب التغيير ويكتشف آفاقاً جديدة.' },
+    'غياث': { value: 9, trait: 'العطاء والقيادة، يمتلك روحاً إنسانية ورغبة في إحداث فرق إيجابي.' },
+};
+
+const staticNameKeywords = {
+    'يامن': ['البركة', 'اليمن', 'التفاؤل', 'الهدوء', 'النجاح'],
+    'غوث': ['الشجاعة', 'النجدة', 'القوة', 'المبادرة', 'الإغاثة'],
+    'غياث': ['العطاء', 'المساعدة', 'القيادة', 'الإيجابية', 'الكرم'],
+};
+
+const staticLullabies = {
+    'يامن': "يامن يا عيني، يا نوم الهنا،\nنام يا حبيبي وفي حضني اغفى.\nبكرة تكبر وتصبح أحلى،\nوالبركة في دربك تمشي على مهلِ.",
+    'غوث': "يا غوثَ قلبي، يا نبض الوجود،\nنومك سلامة، يا أغلى مولود.\nبكرا تصير بطل، يا أقوى أسود،\nترفع راية العون، وتجلب كل جود.",
+    'غياث': "غياث يا روحي، يا وردة الأمل،\nنومك يا روحي، ما أحلى الغزل.\nبكرا بتغيث وتفرح الكل،\nيا قمر الليالي، يا ضي الجبل."
+};
+
+const staticPhoneticAnalysis = {
+    'يامن': {
+        vibration: 'إيقاع هادئ ومريح، يوحي بالسكينة والتناغم. سلس على الأذن واللسان.',
+        flow: 'تدفقه لغوي مريح، يجعله سهلاً في النطق والتذكر في مختلف السياقات.',
+        impact: 'يترك انطباعاً بالبركة والإيجابية، ويعزز شعوراً بالراحة والطمأنينة.'
+    },
+    'غوث': {
+        vibration: 'إيقاع قوي ومباشر، يوحي بالقوة والعزم. صوته جهوري ومميز.',
+        flow: 'تدفقه اللغوي حاد ومحدد، وقد يكون ثقيلاً بعض الشيء على غير الناطقين بحرف الغين.',
+        impact: 'يترك انطباعاً بالشجاعة والنجدة والمبادرة، ويُوحي بشخصية قادرة على العون.'
+    },
+    'غياث': {
+        vibration: 'إيقاع قوي وممتع، يوحي بالنشاط والحيوية. رنينه جذاب وواضح.',
+        flow: 'تدفقه اللغوي رشيق وسهل، مما يجعله مألوفاً ومحبباً للنطق.',
+        impact: 'يترك انطباعاً بالعطاء السخي والقيادة، ويعزز صورة شخصية إيجابية وفعالة.'
+    }
+};
+
+const staticImageMeaningData = {
+    'يامن': {
+        images: [
+            "https://placehold.co/300x200/ADD8E6/FFFFFF?text=شروق+الشمس", // Light blue, sunrise
+            "https://placehold.co/300x200/90EE90/FFFFFF?text=حقل+زهور",   // Light green, flowers
+            "https://placehold.co/300x200/FFD700/FFFFFF?text=عملة+ذهبية"  // Gold, coin
+        ],
+        interpretation: "اسم 'يامن' يوحي بالخير والبركة. شروق الشمس يرمز لبداية جديدة وتفاؤل، حقل الزهور يمثل النماء والجمال، والعملة الذهبية ترمز للرخاء واليُمن. كل هذه الصور تعكس معاني البركة والازدهار المرتبطة بالاسم."
+    },
+    'غوث': {
+        images: [
+            "https://placehold.co/300x200/B22222/FFFFFF?text=قلعة+قوية",   // Firebrick, strong castle
+            "https://placehold.co/300x200/4682B4/FFFFFF?text=يدان+متعاونتان", // Steel blue, helping hands
+            "https://placehold.co/300x200/556B2F/FFFFFF?text=شجرة+عملاقة" // Dark olive green, giant tree
+        ],
+        interpretation: "اسم 'غوث' يرمز للقوة والنجدة والإغاثة. القلعة القوية تعكس الحماية والصلابة، الأيدي المتعاونة تدل على العون والمساعدة، والشجرة العملاقة توحي بالثبات والسند. هذه الصور تجسد معاني الغوث والمساندة."
+    },
+    'غياث': {
+        images: [
+            "https://placehold.co/300x200/008080/FFFFFF?text=مطر+غزير",  // Teal, heavy rain
+            "https://placehold.co/300x200/8A2BE2/FFFFFF?text=نهر+جاري", // Blue-violet, flowing river
+            "https://placehold.co/300x200/FF6347/FFFFFF?text=بذرة+تنمو" // Tomato, growing seed
+        ],
+        interpretation: "اسم 'غياث' يوحي بالعطاء الوفير والإنقاذ، مثل المطر الذي يحيي الأرض. المطر الغزير والنهر الجاري يرمزان للفيض والكرم، والبذرة التي تنمو تدل على الأثر الإيجابي والخير المستمر. تعكس هذه الصور معاني العطاء والإغاثة الكثيرة."
+    }
+};
+
+const staticAIVisualizations = {
+    'يامن': {
+        image: "https://placehold.co/400x300/28A745/FFFFFF?text=نور+وتفاؤل",
+        description: "تصور فني لاسم 'يامن' يجسد هالة من النور الدافئ المحاطة برموز التفاؤل والبركة، مع خطوط انسيابية تعكس الحياة المليئة باليُمن والرخاء. الألوان السائدة هي الذهبي والأخضر الفاتح والأزرق السماوي، مما يوحي بالصفاء والنمو."
+    },
+    'غوث': {
+        image: "https://placehold.co/400x300/DC3545/FFFFFF?text=قوة+ونجدة",
+        description: "لوحة تجريدية لاسم 'غوث' تصور تشابكاً قوياً للخطوط والكتل التي توحي بالدعم والنجدة، مع ألوان داكنة تعكس الشجاعة والصلابة. تظهر أشكالاً رمزية للأيدي الممتدة أو الدروع، تعبيراً عن الحماية والعون."
+    },
+    'غياث': {
+        image: "https://placehold.co/400x300/007BFF/FFFFFF?text=عطاء+وفيض",
+        description: "تصور بصري لاسم 'غياث' يمثل تدفقاً متجدداً من الألوان الزرقاء والخضراء، يشبه فيض الماء الذي يروي الأرض. تتخلله نقاط براقة ترمز للعطاء السخي والتأثير الإيجابي على المحيط، مع لمسة من الأشكال الهندسية التي توحي بالقيادة والتنظيم."
+    }
+};
+
+
+// Main list of names used in the app for various sections
 const nameKeys = ['يامن', 'غوث', 'غياث'];
 
 function App() {
-    // State variables for managing UI and data
+    // State variables for managing UI, data, and user interactions
     const [activeTab, setActiveTab] = useState('analysis');
     const [showRecommendation, setShowRecommendation] = useState(false);
     const [userName, setUserName] = useState('');
@@ -93,53 +212,95 @@ function App() {
     const [tempMessage, setTempMessage] = useState('');
     const [tempMessageType, setTempMessageType] = useState('info');
 
-    // States for "AI-like" generation features (using static content for now)
+    // States for "AI-like" generation features (using static content)
     const [generatedBlessing, setGeneratedBlessing] = useState('');
     const [loadingBlessing, setLoadingBlessing] = useState(false);
     const [suggestedNamesForCard, setSuggestedNamesForCard] = useState({});
     const [loadingSuggestions, setLoadingSuggestions] = useState({});
+    const [generatedPoem, setGeneratedPoem] = useState('');
+    const [loadingPoem, setLoadingPoem] = useState(false);
 
     // States for name analysis and vibe submission
     const [expandedName, setExpandedName] = useState(null);
     const [funFact, setFunFact] = useState('');
-    const [nameVibeInput, setNameVibeInput] = useState(() => localStorage.getItem('nameVibeInput') || '');
-    const initialVibeCounts = useRef(JSON.parse(localStorage.getItem('vibeChosenCounts') || '{}'));
-    const [vibeChosenCounts, setVibeChosenCounts] = useState(initialVibeCounts.current);
+    const [selectedImageMeaningName, setSelectedImageMeaningName] = useState(null);
+    const [selectedPhoneticAnalysisName, setSelectedPhoneticAnalysisName] = useState(null);
 
-    // Quiz Game States
+
+    // Quiz Game States (Ideal Name Quiz)
     const [quizStarted, setQuizStarted] = useState(false);
     const [currentQuizQuestionIndex, setCurrentQuizQuestionIndex] = useState(0);
-    // FIX 1: Ensure quizScores is always an object, explicitly defining the keys with initial zeros.
-    // This addresses the ESLint warning and potential runtime errors related to undefined `quizScores`.
     const [quizScores, setQuizScores] = useState(() => {
         const initialScores = {};
-        // Defensive check to ensure nameKeys is an array before iterating
-        if (Array.isArray(nameKeys)) {
+        if (Array.isArray(nameKeys)) { // Defensive check
             nameKeys.forEach(name => { initialScores[name] = 0; });
         }
         return initialScores;
     });
     const [quizResult, setQuizResult] = useState(null);
 
-    // Name Vibe Matching Game States
-    const [vibeGameStarted, setVibeGameStarted] = useState(false);
-    const [vibeGameCurrentName, setVibeGameCurrentName] = useState(null);
-    const [vibeGameOptions, setVibeGameOptions] = useState([]);
-    const [vibeGameScore, setVibeGameScore] = useState(0);
-    const [vibeGameMatches, setVibeGameMatches] = useState({}); // { name: [selectedVibe, correctVibe] }
-    const vibeGameNames = ['يامن', 'غوث', 'غياث'];
-    const vibeDefinitions = {
-        'يامن': ['بركة', 'تفاؤل', 'حظ سعيد', 'هادئ'],
-        'غوث': ['شجاعة', 'نجدة', 'قوة', 'مبادرة'],
-        'غياث': ['عطاء', 'مساعدة', 'قيادة', 'إيجابية'],
-    };
+    // Name-Trait Matching Game States
+    const [traitGameStarted, setTraitGameStarted] = useState(false);
+    const [currentTraitIndex, setCurrentTraitIndex] = useState(0);
+    const [traitGameScore, setTraitGameScore] = useState(0);
+    const [traitGameFeedback, setTraitGameFeedback] = useState('');
+    const traitQuestions = React.useMemo(() => [
+        { trait: "الشجاعة والمبادرة", correctName: "غوث" },
+        { trait: "البركة والخير", correctName: "يامن" },
+        { trait: "العطاء والقيادة", correctName: "غياث" },
+    ], []); // Memoize traitQuestions
+
+    // Name Story Completion Game States
+    const [storyGameStarted, setStoryGameStarted] = useState(false);
+    const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
+    const [storyGameScore, setStoryGameScore] = useState(0);
+    const [storyGameFeedback, setStoryGameFeedback] = useState('');
+    const storyQuestions = React.useMemo(() => [
+        {
+            storyPart: "في يومٍ مشمسٍ، انطلق في رحلة استكشافية جريئة، متحدياً الصعاب بشجاعة نادرة. كان دائماً أول من يقفز لتقديم العون...",
+            correctName: "غوث"
+        },
+        {
+            storyPart: "كانت ابتسامته تضيء المكان، وكلما دخل مكاناً حلّت البركة فيه. كان يجلب السعادة والتفاؤل لمن حوله...",
+            correctName: "يامن"
+        },
+        {
+            storyPart: "بقلبه الكبير ويده المعطاءة، كان سباقاً لفعل الخير ومساعدة المحتاجين. قاد مبادرات عديدة جلبت الفرح للكثيرين...",
+            correctName: "غياث"
+        },
+    ], []); // Memoize storyQuestions
+
+    // Name Memory Challenge Game States
+    const [memoryGameStarted, setMemoryGameStarted] = useState(false);
+    const [memoryCards, setMemoryCards] = useState([]);
+    const [flippedCards, setFlippedCards] = useState([]);
+    const [matchedCards, setMatchedCards] = useState([]);
+    const [moves, setMoves] = useState(0);
+    const [memoryGameMessage, setMemoryGameMessage] = useState('');
+    const memoryGamePairs = React.useMemo(() => [
+        { id: 1, name: 'يامن', vibe: 'بركة' },
+        { id: 2, name: 'غوث', vibe: 'شجاعة' },
+        { id: 3, name: 'غياث', vibe: 'عطاء' },
+    ], []); // Memoize memoryGamePairs
+
+    // Parents' Pledge State (saved to local storage)
+    const [parentsPledge, setParentsPledge] = useState(() => localStorage.getItem('parentsPledge') || '');
+
+    // Future Vision Design State
+    const [futureVisionNameInput, setFutureVisionNameInput] = useState('');
+    const [futureVisionTraits, setFutureVisionTraits] = useState([]);
+    const [futureVisionMotto, setFutureVisionMotto] = useState('');
+    const [generatedFutureVision, setGeneratedFutureVision] = useState('');
+
+    // AI Baby Visualization State
+    const [selectedAIVisualizationName, setSelectedAIVisualizationName] = useState(null);
 
 
     // Ref to track if initial Firebase sign-in attempt has been made
     const initialSignInAttempted = useRef(false);
 
-    // Countdown state - FIX 2: Use useMemo for targetDate to prevent re-creation on every render,
-    // which was causing the react-hooks/exhaustive-deps warning for the useEffect below.
+    // Countdown state - Using useMemo for targetDate to prevent re-creation on every render,
+    // which resolves the ESLint warning related to useEffect dependencies.
     const targetDate = React.useMemo(() => new Date('2025-06-03T00:00:00'), []);
     const [countdown, setCountdown] = useState({});
 
@@ -166,11 +327,10 @@ function App() {
         const timer = setInterval(calculateCountdown, 1000);
 
         return () => clearInterval(timer);
-    }, [targetDate]); // targetDate is now stable due to useMemo
+    }, [targetDate]); // targetDate is stable due to useMemo
+
 
     // Firebase Authentication & Listeners - Using useCallback to memoize and prevent infinite loops
-    // FIX 3: Removed 'firebaseEnabled' from useCallback's dependency array.
-    // ESLint indicates it's an unnecessary dependency as it's an outer scope value that doesn't trigger re-renders.
     const setupFirebaseAuth = useCallback(async () => {
         if (!firebaseEnabled) { // firebaseEnabled is a stable value after initial app load for the purpose of this hook
             setCurrentUser({ uid: 'mock-user-id', isAnonymous: true });
@@ -218,9 +378,9 @@ function App() {
         });
 
         return () => unsubscribeAuth();
-    }, []); // firebaseEnabled removed from dependency array as per ESLint recommendation
+    }, []); // Removed 'firebaseEnabled' from dependency array as per ESLint recommendation
 
-    // Effect to run authentication setup
+    // Effect to run authentication setup on component mount
     useEffect(() => {
         setupFirebaseAuth();
     }, [setupFirebaseAuth]);
@@ -263,7 +423,7 @@ function App() {
             console.error("Error fetching comments:", error);
             let errorMessage = "تعذر جلب التعليقات من Firebase. قد تكون هناك مشكلة في الإعدادات.";
             if (error.code === 'unavailable') {
-                errorMessage = "تعذر الاتصال بخدمة Firebase (Firestore). يرجى التحقق من اتصال الإنترنت لديكم أو إعدادات Firebase الخاصة بالمشروع (مثل جدار الحماية أو قواعد الأمان في Firebase Console).";
+                errorMessage = "تعذر الاتصال بخدمة Firebase (Firestore). يرجerification, please ensure that you have correctly configured Firebase for your project or check your internet connection.";
             }
             showTemporaryMessage(errorMessage, 'error');
         });
@@ -276,14 +436,14 @@ function App() {
     }, [currentUser, firebaseEnabled]); // Keep these dependencies as they genuinely affect the Firestore listeners
 
     // Function to show temporary messages to the user (e.g., success/error notifications)
-    const showTemporaryMessage = (message, type = 'info') => {
+    const showTemporaryMessage = (message, type = 'info', duration = 3000) => {
         setTempMessage(message);
         setTempMessageType(type);
         const messageBox = document.getElementById('temp-message-box');
         if (messageBox) {
             messageBox.className = `fixed top-4 right-4 text-white p-3 rounded-lg shadow-lg z-50 animate-fadeInOut ${type === 'error' ? 'bg-red-600' : (type === 'success' ? 'bg-green-600' : 'bg-blue-600')}`;
         }
-        setTimeout(() => setTempMessage(''), 3000); // Message disappears after 3 seconds
+        setTimeout(() => setTempMessage(''), duration); // Message disappears after 'duration' milliseconds
     };
 
     // Handler for name voting
@@ -390,21 +550,24 @@ function App() {
         showTemporaryMessage(`تم تحديد هويتك كـ ${newUserName}.`, 'info');
     };
 
-    // Function to retrieve static content (blessings, fun facts, similar names)
-    // Used when AI generation is disabled or not applicable.
-    const getStaticContent = (type, name, meaning = '') => {
+    // Function to retrieve static content (blessings, fun facts, similar names, poems)
+    const getStaticContent = (type, name) => {
         if (type === 'blessing') {
             return staticBlessings[name] || "لا توجد بركة محددة لهذا الاسم حالياً.";
         } else if (type === 'funFact') {
             return staticFunFacts[name] || "لا توجد معلومة شيقة محددة لهذا الاسم حالياً.";
         } else if (type === 'similarNames') {
             return staticSimilarNames[name] || "لا توجد أسماء مشابهة مقترحة لهذا الاسم حالياً.";
+        } else if (type === 'poem') {
+            return staticNamePoems[name] || "لا توجد قصيدة محددة لهذا الاسم حالياً.";
+        } else if (type === 'lullaby') {
+            return staticLullabies[name] || "لا توجد أغنية مهد لهذا الاسم حالياً.";
         }
         return "المحتوى غير متوفر.";
     };
 
     // Handlers for generating static content
-    const handleGenerateBlessing = async (name, meaning) => {
+    const handleGenerateBlessing = async (name) => {
         setLoadingBlessing(true);
         setGeneratedBlessing('');
         const text = getStaticContent('blessing', name);
@@ -412,7 +575,7 @@ function App() {
         setLoadingBlessing(false);
     };
 
-    const handleGenerateSimilarNames = async (name, meaning) => {
+    const handleGenerateSimilarNames = async (name) => {
         setLoadingSuggestions(prev => ({ ...prev, [name]: true }));
         setSuggestedNamesForCard(prev => ({ ...prev, [name]: '' }));
         const text = getStaticContent('similarNames', name);
@@ -426,51 +589,15 @@ function App() {
         setFunFact(text);
     };
 
-    // Handler for submitting name vibe choices
-    const handleNameVibeSubmission = (name, vibe) => {
-        setVibeChosenCounts(prevCounts => {
-            const newCounts = { ...prevCounts };
-            if (!newCounts[name]) newCounts[name] = {};
-            newCounts[name][vibe] = (newCounts[name][vibe] || 0) + 1;
-            localStorage.setItem('vibeChosenCounts', JSON.stringify(newCounts)); // Persist locally
-            return newCounts;
-        });
-        showTemporaryMessage(`تم اختيار "${vibe}" لاسم ${name}!`, 'success');
+    const handleGeneratePoem = async (name) => {
+        setLoadingPoem(true);
+        setGeneratedPoem('');
+        const text = getStaticContent('poem', name);
+        setGeneratedPoem(text);
+        setLoadingPoem(false);
     };
 
-    // Tone.js sound playing function for name melodies
-    const playNameSound = (name) => {
-        if (typeof window.Tone === 'undefined') {
-            showTemporaryMessage("مكتبة الصوت غير متاحة. يرجى التأكد من تحميل Tone.js CDN.", 'error');
-            return;
-        }
-
-        const synth = new window.Tone.Synth().toDestination();
-        let melody;
-        switch (name) {
-            case 'يامن':
-                melody = ["C4", "E4", "G4", "C5"];
-                break;
-            case 'غوث':
-                melody = ["G3", "D4", "G4", "B4"];
-                break;
-            case 'غياث':
-                melody = ["A3", "C4", "E4", "A4"];
-                break;
-            default:
-                melody = ["C4", "D4", "E4", "F4"];
-        }
-
-        let time = window.Tone.now();
-        melody.forEach(note => {
-            synth.triggerAttackRelease(note, "8n", time);
-            time += 0.2;
-        });
-        showTemporaryMessage(`يتم تشغيل نغمة لاسم ${name}`, 'info');
-    };
-
-
-    // Detailed name information and analysis data
+    // Name Details (unchanged as per previous instructions, 'الغوث' is intentionally included as a name for analysis, but not in nameKeys for selection)
     const nameDetails = {
         'يامن': {
             meaning: 'المبارك، الميمون، ذو اليمين، كثير اليمن والبركة.',
@@ -521,12 +648,12 @@ function App() {
             practical: 'سهل النطق والكتابة نسبياً. قد يظل حرف الغين تحدياً لغير الناطقين بالعربية ولكن أقل من "غوث". يتناسق جيداً مع لقب "الغزالي" وله رنين قوي وجذاب.',
             futuristic: 'اسم قوي وذو معنى إيجابي دائم، يحافظ على جاذبيته عبر الأجيال. يوحي بالقيادة والمبادرة والقدرة على الإنجاز والعطاء.',
             personalStrength: 'يوحي بالقيادة، العطاء، والقدرة على إحداث فرق إيجابي في حياة الآخرين، مما يدل على شخصية قوية وملهمة ومحبة للمساعدة.',
-            compatibility: 'يتناسب بشكل ممتاز مع "الغزالي" وله رنين قوي وجذاب، مما يضيف للقب جمالاً.',
+            compatibility: 'يتناسب بشكل ممتاز مع "الغزالي" وله رنين قوي وجذاب، مما يضيف لللقب جمالاً.',
             rhythm: 'إيقاع قوي وممتع، يوحي بالنشاط والحيوية والفعالية في الحركة.',
             otherMeaning: 'لا يوجد معنى سلبي في لغات أخرى معروفة، وهو ما يجعله آمناً للاستخدام.',
             uniqueness: 'متوازن بين الفرادة والشيوع، فهو ليس نادراً جداً ولكنه مميز بشكل كافٍ ليبرز حامله.',
             acceptance: 'مقبول عالمياً في الثقافة العربية والإسلامية، ولا يثير أي اعتراضات.',
-            alternativeInterpretation: 'لا يوجد اختلاف جوهري في تفسير هذا الاسم، فدلالاته على الإغاثة والعون واضحة، وهو صيغة مبالغة من "غوث" تُستخدم للدلالة على الكثرة.',
+            alternativeInterpretation: 'لا يوجد اختلاف جوهري في تفسير هذا الاسم، فdلالاته على الإغاثة والعون واضحة، وهو صيغة مبالغة من "غوث" تُستخدم للدلالة على الكثرة.',
             score: 9.0
         },
     };
@@ -587,7 +714,7 @@ function App() {
                         )}
 
                         <button
-                            onClick={(e) => { e.stopPropagation(); handleGenerateSimilarNames(name, details.meaning); }}
+                            onClick={(e) => { e.stopPropagation(); handleGenerateSimilarNames(name); }}
                             className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-pink-300 flex items-center justify-center space-x-2 mt-4"
                             disabled={loadingSuggestions[name]}
                         >
@@ -611,13 +738,32 @@ function App() {
                                 <p className="whitespace-pre-wrap">{suggestedNamesForCard[name]}</p>
                             </div>
                         )}
+                        {/* New feature: Generate a short poem/rhyme for the name */}
                         <button
-                            onClick={(e) => { e.stopPropagation(); playNameSound(name); }}
-                            className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 flex items-center justify-center space-x-2 mt-4"
+                            onClick={(e) => { e.stopPropagation(); handleGeneratePoem(name); }}
+                            className="w-full bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-yellow-300 flex items-center justify-center space-x-2 mt-4"
+                            disabled={loadingPoem}
                         >
-                            <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" d="M9.384 5.338A1 1 0 0110 5h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-.616-.162l-3-2A1 1 0 016 7V5a1 1 0 011-1h2.384zM10 2a8 8 0 110 16 8 8 0 010-16zM5 10a1 1 0 011-1h2.384l3 2a1 1 0 01.616.162V12a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" clipRule="evenodd"></path></svg>
-                            <span>استمع لنغمة الاسم</span>
+                            {loadingPoem ? (
+                                <>
+                                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span>جاري توليد القصيدة...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <span>✍️ توليد قصيدة/قافية عن الاسم</span>
+                                </>
+                            )}
                         </button>
+                        {generatedPoem && (
+                            <div className="mt-4 bg-yellow-50 p-4 rounded-lg text-base text-gray-800 border border-yellow-200 animate-fadeIn">
+                                <h4 className="font-semibold text-orange-700 mb-2 border-b border-orange-300 pb-1 font-cairo-display">قصيدة/قافية لاسم {name}:</h4>
+                                <p className="whitespace-pre-wrap">{generatedPoem}</p>
+                            </div>
+                        )}
                     </div>
                 </>
             )}
@@ -734,7 +880,7 @@ function App() {
                                 </ul>
                                 <div className="mt-8 pt-4 border-t border-indigo-300">
                                     <button
-                                        onClick={() => handleGenerateBlessing(rec.name, rec.meaning)}
+                                        onClick={() => handleGenerateBlessing(rec.name)}
                                         className="w-full bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-green-300 flex items-center justify-center space-x-2"
                                         disabled={loadingBlessing}
                                     >
@@ -771,7 +917,7 @@ function App() {
     };
 
     // Quiz Questions and Logic for the "Ideal Name Quiz" game
-    const quizQuestions = [
+    const quizQuestions = React.useMemo(() => [
         {
             question: "ما هي الصفة الأهم التي تتمنونها في شخصية طفلكما المستقبلية؟",
             options: [
@@ -804,7 +950,7 @@ function App() {
                 { text: "يوحي بالعطاء والقيادة", scores: { 'يامن': 2, 'غوث': 2, 'غياث': 3 } },
             ]
         },
-    ];
+    ], []); // Memoize quizQuestions
 
     // Function to start the quiz
     const startQuiz = () => {
@@ -859,78 +1005,202 @@ function App() {
         setQuizResult(null);
     };
 
-    // Name Vibe Matching Game Logic
-    const startVibeGame = () => {
-        setVibeGameStarted(true);
-        setVibeGameScore(0);
-        setVibeGameMatches({});
-        loadNextVibeGameName();
+    // --- New Game 1: Name-Trait Matching Game ---
+    const startTraitGame = () => {
+        setTraitGameStarted(true);
+        setCurrentTraitIndex(0);
+        setTraitGameScore(0);
+        setTraitGameFeedback('');
     };
 
-    const loadNextVibeGameName = () => {
-        if (vibeGameNames.length > Object.keys(vibeGameMatches).length) {
-            let nextName;
-            do {
-                nextName = vibeGameNames[Math.floor(Math.random() * vibeGameNames.length)];
-            } while (vibeGameMatches[nextName]); // Ensure unique name is selected
-
-            setVibeGameCurrentName(nextName);
-
-            // Shuffle vibes including correct ones and some random ones for options
-            const correctVibes = vibeDefinitions[nextName];
-            let allPossibleVibes = new Set();
-            vibeGameNames.forEach(n => vibeDefinitions[n].forEach(v => allPossibleVibes.add(v)));
-            allPossibleVibes = Array.from(allPossibleVibes);
-
-            const shuffledOptions = [...correctVibes];
-            // FIX 4: Corrected typo from allPossibleVebes to allPossibleVibes in this line.
-            while (shuffledOptions.length < 4 && shuffledOptions.length < allPossibleVibes.length) {
-                const randomVibe = allPossibleVibes[Math.floor(Math.random() * allPossibleVibes.length)];
-                if (!shuffledOptions.includes(randomVibe)) {
-                    shuffledOptions.push(randomVibe);
-                }
-            }
-            // Shuffle the options array to randomize display order
-            shuffledOptions.sort(() => Math.random() - 0.5);
-            setVibeGameOptions(shuffledOptions);
-
+    const handleTraitAnswer = (selectedName) => {
+        const currentTrait = traitQuestions[currentTraitIndex];
+        if (selectedName === currentTrait.correctName) {
+            setTraitGameScore(prev => prev + 1);
+            setTraitGameFeedback('إجابة صحيحة! 🎉');
         } else {
-            setVibeGameCurrentName(null); // Game over when all names have been matched
-        }
-    };
-
-    // Handler for submitting a vibe match
-    const handleVibeMatch = (selectedVibe) => {
-        if (!vibeGameCurrentName) return; // Prevent action if no current name
-
-        const correctVibes = vibeDefinitions[vibeGameCurrentName];
-        const isCorrect = correctVibes.includes(selectedVibe);
-
-        setVibeGameMatches(prev => ({
-            ...prev,
-            [vibeGameCurrentName]: [selectedVibe, correctVibes[0]] // Store selected and one correct for display
-        }));
-
-        if (isCorrect) {
-            setVibeGameScore(prev => prev + 1);
-            showTemporaryMessage("إجابة صحيحة!", 'success');
-        } else {
-            showTemporaryMessage("إجابة خاطئة.", 'error');
+            setTraitGameFeedback(`إجابة خاطئة. الصحيح هو: ${currentTrait.correctName} 😔`);
         }
 
         setTimeout(() => {
-            loadNextVibeGameName(); // Load next name after a short delay
-        }, 1000);
+            setTraitGameFeedback('');
+            if (currentTraitIndex < traitQuestions.length - 1) {
+                setCurrentTraitIndex(prev => prev + 1);
+            } else {
+                // Game over
+                setTraitGameStarted(false); // End the game
+            }
+        }, 1500);
     };
 
-    // Function to reset the vibe matching game
-    const resetVibeGame = () => {
-        setVibeGameStarted(false);
-        setVibeGameScore(0);
-        setVibeGameMatches({});
-        setVibeGameCurrentName(null);
-        setVibeGameOptions([]);
+    const resetTraitGame = () => {
+        setTraitGameStarted(false);
+        setCurrentTraitIndex(0);
+        setTraitGameScore(0);
+        setTraitGameFeedback('');
     };
+
+    // --- New Game 2: Name Story Completion Game ---
+    const startStoryGame = () => {
+        setStoryGameStarted(true);
+        setCurrentStoryIndex(0);
+        setStoryGameScore(0);
+        setStoryGameFeedback('');
+    };
+
+    const handleStoryAnswer = (selectedName) => {
+        const currentStory = storyQuestions[currentStoryIndex];
+        if (selectedName === currentStory.correctName) {
+            setStoryGameScore(prev => prev + 1);
+            setStoryGameFeedback('إجابة صحيحة! 🎉');
+        } else {
+            setStoryGameFeedback(`إجابة خاطئة. الصحيح هو: ${currentStory.correctName} 😔`);
+        }
+
+        setTimeout(() => {
+            setStoryGameFeedback('');
+            if (currentStoryIndex < storyQuestions.length - 1) {
+                setCurrentStoryIndex(prev => prev + 1);
+            } else {
+                // Game over
+                setStoryGameStarted(false); // End the game
+            }
+        }, 1500);
+    };
+
+    const resetStoryGame = () => {
+        setStoryGameStarted(false);
+        setCurrentStoryIndex(0);
+        setStoryGameScore(0);
+        setStoryGameFeedback('');
+    };
+
+    // --- New Game 3: Name Memory Challenge ---
+    const initializeMemoryGame = useCallback(() => {
+        const cards = [...memoryGamePairs, ...memoryGamePairs].map((item, index) => ({
+            ...item,
+            uniqueId: `${item.id}-${item.vibe}-${index}`, // Ensure unique ID for each card
+            isFlipped: false,
+            isMatched: false
+        }));
+        // Shuffle cards
+        cards.sort(() => Math.random() - 0.5);
+        setMemoryCards(cards);
+        setFlippedCards([]);
+        setMatchedCards([]);
+        setMoves(0);
+        setMemoryGameMessage('');
+    }, [memoryGamePairs]); // Depend on memoized memoryGamePairs
+
+    const startMemoryGame = () => {
+        initializeMemoryGame();
+        setMemoryGameStarted(true);
+    };
+
+    const handleCardClick = (clickedCard) => {
+        if (flippedCards.length === 2 || clickedCard.isFlipped || clickedCard.isMatched) {
+            return; // Don't allow clicking more than two cards or already matched/flipped cards
+        }
+
+        const newFlippedCards = [...flippedCards, clickedCard];
+        setFlippedCards(newFlippedCards);
+        setMoves(prev => prev + 1);
+
+        const updatedCards = memoryCards.map(card =>
+            card.uniqueId === clickedCard.uniqueId ? { ...card, isFlipped: true } : card
+        );
+        setMemoryCards(updatedCards);
+
+        if (newFlippedCards.length === 2) {
+            const [firstCard, secondCard] = newFlippedCards;
+            if (firstCard.name === secondCard.name && firstCard.vibe === secondCard.vibe) {
+                // It's a match!
+                setMatchedCards(prev => [...prev, firstCard.uniqueId, secondCard.uniqueId]);
+                setMemoryGameMessage('مطابقة صحيحة! 🎉');
+                setTimeout(() => {
+                    setFlippedCards([]); // Clear flipped cards
+                    setMemoryGameMessage('');
+                    if (matchedCards.length + 2 === memoryCards.length) {
+                        setMemoryGameMessage(`رائع! أكملت اللعبة في ${moves + 1} نقلة!`);
+                        setMemoryGameStarted(false); // End game
+                    }
+                }, 700);
+            } else {
+                // Not a match
+                setMemoryGameMessage('ليست مطابقة. حاول مرة أخرى. 😔');
+                setTimeout(() => {
+                    setMemoryCards(prevCards =>
+                        prevCards.map(card =>
+                            (card.uniqueId === firstCard.uniqueId || card.uniqueId === secondCard.uniqueId)
+                                ? { ...card, isFlipped: false }
+                                : card
+                        )
+                    );
+                    setFlippedCards([]); // Clear flipped cards
+                    setMemoryGameMessage('');
+                }, 1000);
+            }
+        }
+    };
+
+    const resetMemoryGame = () => {
+        setMemoryGameStarted(false);
+        initializeMemoryGame();
+    };
+
+    // Helper for random name selection for "Name Dice Roll"
+    const handleDiceRoll = () => {
+        const randomIndex = Math.floor(Math.random() * nameKeys.length);
+        const randomName = nameKeys[randomIndex];
+        showTemporaryMessage(`حجر النرد اختار: "${randomName}"! أتمنى له مستقبلاً باهراً!`, 'success', 4000);
+    };
+
+    // Helper for Name Meaning Through Images activity
+    const handleShowImageMeaning = (name) => {
+        setSelectedImageMeaningName(name);
+        // Message will be shown when the component is rendered.
+    };
+
+    // Helper for Phonetic Analysis activity
+    const handleShowPhoneticAnalysis = (name) => {
+        setSelectedPhoneticAnalysisName(name);
+        // Message will be shown when the component is rendered.
+    };
+
+    // Handler for Parents' Pledge - save to local storage
+    const handlePledgeSave = () => {
+        localStorage.setItem('parentsPledge', parentsPledge);
+        showTemporaryMessage("تم حفظ تعهدكما بنجاح!", 'success');
+    };
+
+    // Handler for Future Vision Design
+    const handleGenerateFutureVision = () => {
+        if (!futureVisionNameInput.trim()) {
+            showTemporaryMessage("الرجاء إدخال الاسم المقترح أولاً.", 'error');
+            return;
+        }
+
+        const traitsText = futureVisionTraits.length > 0 ? `وسيحمل صفات رائعة مثل: ${futureVisionTraits.join(', ')}.` : '';
+        const mottoText = futureVisionMotto.trim() ? `شعار حياته سيكون: "${futureVisionMotto}".` : '';
+
+        const visionStatement = `
+        نتخيل مستقبل طفلنا العزيز ${futureVisionNameInput}، وهو ينمو ليصبح شخصية فريدة ومؤثرة.
+        نسعى لغرس قيم العطاء والشجاعة والحكمة في قلبه.
+        ${traitsText}
+        ${mottoText}
+        نرى فيه قائداً ملهماً، وبصمة إيجابية في هذا العالم.
+        ليكن نوره ساطعاً، وحياته مليئة بالإنجازات والسعادة.
+        `;
+        setGeneratedFutureVision(visionStatement);
+        showTemporaryMessage("تم توليد رؤيتكما المستقبلية!", 'success');
+    };
+
+    // Handler for AI Baby Visualization
+    const handleAIVisualization = (name) => {
+        setSelectedAIVisualizationName(name);
+        showTemporaryMessage(`جاري تصور مولود بذكاء اصطناعي لاسم "${name}"...`, 'info', 2000);
+    };
+
 
     // Function to determine background classes based on active tab for visual variety
     const getBackgroundClasses = (tab) => {
@@ -973,13 +1243,8 @@ function App() {
                     <span className="block sm:inline">وظائف حفظ البيانات (التصويت، التعليقات) **معطلة حالياً**. يرجى إعداد مشروع Firebase الخاص بكم لتفعيلها لاحقاً.</span>
                 </div>
             )}
-            {/* Note for non-Canvas environments where AI generation might be replaced by static content */}
-            {!IS_CANVAS_ENVIRONMENT && (
-                <div className="bg-orange-100 border border-orange-400 text-orange-700 px-4 py-3 rounded-lg relative mb-4 w-full max-w-xl text-center shadow-md animate-fadeIn">
-                    <strong className="font-bold">ملاحظة: </strong>
-                    <span className="block sm:inline">ميزات الذكاء الاصطناعي (توليد البركات والمعلومات) **معطلة حالياً** في هذا الإصدار المنشور لضمان استقرار التطبيق. تم استبدالها بمحتوى ثابت.</span>
-                </div>
-            )}
+            {/* Removed the AI warning as requested */}
+
             {/* Main application container with shared styling */}
             <div className="w-full max-w-6xl bg-white rounded-xl shadow-2xl overflow-hidden mb-8 transform transition-all duration-300">
                 {/* Header section with title, description, and countdown */}
@@ -1003,25 +1268,25 @@ function App() {
                     )}
                 </header>
 
-                {/* Navigation tabs */}
+                {/* Navigation tabs - Adjusted for better responsiveness and centering */}
                 <nav className="bg-gradient-to-r from-blue-500 to-indigo-600 p-3 shadow-md">
-                    <ul className="flex justify-around text-white font-semibold text-base sm:text-lg">
-                        <li className={`cursor-pointer px-4 py-2 rounded-full transition-all duration-300 ${activeTab === 'analysis' ? 'bg-white text-indigo-600 shadow-lg' : 'hover:bg-indigo-500'}`} onClick={() => { setActiveTab('analysis'); setExpandedName(null); }}>
+                    <ul className="flex flex-wrap justify-center text-white font-semibold text-base sm:text-lg">
+                        <li className={`flex-shrink-0 cursor-pointer px-3 py-2 rounded-full m-1 transition-all duration-300 ${activeTab === 'analysis' ? 'bg-white text-indigo-600 shadow-lg' : 'hover:bg-indigo-500'}`} onClick={() => { setActiveTab('analysis'); setExpandedName(null); }}>
                             تحليل الأسماء
                         </li>
-                        <li className={`cursor-pointer px-4 py-2 rounded-full transition-all duration-300 ${activeTab === 'comparison' ? 'bg-white text-indigo-600 shadow-lg' : 'hover:bg-indigo-500'}`} onClick={() => setActiveTab('comparison')}>
+                        <li className={`flex-shrink-0 cursor-pointer px-3 py-2 rounded-full m-1 transition-all duration-300 ${activeTab === 'comparison' ? 'bg-white text-indigo-600 shadow-lg' : 'hover:bg-indigo-500'}`} onClick={() => setActiveTab('comparison')}>
                             مقارنة وتقييم
                         </li>
-                        <li className={`cursor-pointer px-4 py-2 rounded-full transition-all duration-300 ${activeTab === 'voting' ? 'bg-white text-indigo-600 shadow-lg' : 'hover:bg-indigo-500'}`} onClick={() => setActiveTab('voting')}>
+                        <li className={`flex-shrink-0 cursor-pointer px-3 py-2 rounded-full m-1 transition-all duration-300 ${activeTab === 'voting' ? 'bg-white text-indigo-600 shadow-lg' : 'hover:bg-indigo-500'}`} onClick={() => setActiveTab('voting')}>
                             تصويت وآراء
                         </li>
-                        <li className={`cursor-pointer px-4 py-2 rounded-full transition-all duration-300 ${activeTab === 'games' ? 'bg-white text-indigo-600 shadow-lg' : 'hover:bg-indigo-500'}`} onClick={() => setActiveTab('games')}>
+                        <li className={`flex-shrink-0 cursor-pointer px-3 py-2 rounded-full m-1 transition-all duration-300 ${activeTab === 'games' ? 'bg-white text-indigo-600 shadow-lg' : 'hover:bg-indigo-500'}`} onClick={() => setActiveTab('games')}>
                             ألعاب مسلية
                         </li>
-                        <li className={`cursor-pointer px-4 py-2 rounded-full transition-all duration-300 ${activeTab === 'message' ? 'bg-white text-indigo-600 shadow-lg' : 'hover:bg-indigo-500'}`} onClick={() => setActiveTab('message')}>
+                        <li className={`flex-shrink-0 cursor-pointer px-3 py-2 rounded-full m-1 transition-all duration-300 ${activeTab === 'message' ? 'bg-white text-indigo-600 shadow-lg' : 'hover:bg-indigo-500'}`} onClick={() => setActiveTab('message')}>
                             رسالة للوالدين
                         </li>
-                        <li className={`cursor-pointer px-4 py-2 rounded-full transition-all duration-300 ${activeTab === 'recommendation' ? 'bg-white text-indigo-600 shadow-lg' : 'hover:bg-indigo-500'}`} onClick={() => setActiveTab('recommendation')}>
+                        <li className={`flex-shrink-0 cursor-pointer px-3 py-2 rounded-full m-1 transition-all duration-300 ${activeTab === 'recommendation' ? 'bg-white text-indigo-600 shadow-lg' : 'hover:bg-indigo-500'}`} onClick={() => setActiveTab('recommendation')}>
                             الترشيح النهائي
                         </li>
                     </ul>
@@ -1049,6 +1314,130 @@ function App() {
                                     />
                                 ))}
                             </div>
+
+                            {/* New activities in Analysis tab, outside the cards */}
+                            <div className="mt-12 space-y-8">
+                                {/* Activity 1: Name Numerology */}
+                                <div className="bg-white rounded-xl shadow-lg p-6 border border-blue-200 text-center">
+                                    <h3 className="text-2xl font-bold text-blue-700 mb-4 border-b pb-2 font-cairo-display">
+                                        ✨ اسمك وقيمته الرقمية ✨
+                                    </h3>
+                                    <p className="text-gray-700 mb-6">
+                                        اكتشفوا القيمة الرقمية لاسم مولودكما والصفة المرتبطة بها (للترفيه فقط!):
+                                    </p>
+                                    <div className="flex flex-wrap justify-center gap-4">
+                                        {nameKeys.map(name => (
+                                            <button
+                                                key={`num-${name}`}
+                                                onClick={() => {
+                                                    const data = staticNumerology[name];
+                                                    if (data) {
+                                                        showTemporaryMessage(`اسم ${name} قيمته الرقمية ${data.value} ويرتبط بصفة: ${data.trait}`, 'info');
+                                                    } else {
+                                                        showTemporaryMessage("لا توجد بيانات رقمية لهذا الاسم.", 'info');
+                                                    }
+                                                }}
+                                                className="bg-indigo-100 text-indigo-800 font-bold py-3 px-6 rounded-full shadow-md hover:bg-indigo-200 transition-colors transform hover:scale-105"
+                                            >
+                                                {name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Activity 2: Keywords for Your Name */}
+                                <div className="bg-white rounded-xl shadow-lg p-6 border border-green-200 text-center">
+                                    <h3 className="text-2xl font-bold text-green-700 mb-4 border-b pb-2 font-cairo-display">
+                                        🔑 الكلمات المفتاحية لاسمك 🔑
+                                    </h3>
+                                    <p className="text-gray-700 mb-6">
+                                        اختارا اسماً وشاهدا الكلمات المفتاحية التي تصف جوهره:
+                                    </p>
+                                    <div className="flex flex-wrap justify-center gap-4">
+                                        {nameKeys.map(name => (
+                                            <button
+                                                key={`keywords-${name}`}
+                                                onClick={() => {
+                                                    const keywords = staticNameKeywords[name];
+                                                    if (keywords) {
+                                                        showTemporaryMessage(`الكلمات المفتاحية لاسم ${name}: ${keywords.join(', ')}`, 'info');
+                                                    } else {
+                                                        showTemporaryMessage("لا توجد كلمات مفتاحية لهذا الاسم.", 'info');
+                                                    }
+                                                }}
+                                                className="bg-teal-100 text-teal-800 font-bold py-3 px-6 rounded-full shadow-md hover:bg-teal-200 transition-colors transform hover:scale-105"
+                                            >
+                                                {name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Activity 3: Name Meaning Through Images */}
+                                <div className="bg-white rounded-xl shadow-lg p-6 border border-purple-200 text-center">
+                                    <h3 className="text-2xl font-bold text-purple-700 mb-4 border-b pb-2 font-cairo-display">
+                                        🖼️ اكتشف معنى اسمك بالصور 🖼️
+                                    </h3>
+                                    <p className="text-gray-700 mb-6">
+                                        اختاروا اسماً وشاهدوا الصور التي تجسد معانيه بشكل فني:
+                                    </p>
+                                    <div className="flex flex-wrap justify-center gap-4 mb-6">
+                                        {nameKeys.map(name => (
+                                            <button
+                                                key={`img-meaning-${name}`}
+                                                onClick={() => handleShowImageMeaning(name)}
+                                                className="bg-pink-100 text-pink-800 font-bold py-3 px-6 rounded-full shadow-md hover:bg-pink-200 transition-colors transform hover:scale-105"
+                                            >
+                                                {name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {selectedImageMeaningName && staticImageMeaningData[selectedImageMeaningName] && (
+                                        <div className="mt-4 bg-purple-50 p-4 rounded-lg text-base text-gray-800 border border-purple-200 animate-fadeIn">
+                                            <h4 className="font-semibold text-purple-700 mb-2 border-b border-purple-300 pb-1 font-cairo-display">
+                                                صور لاسم {selectedImageMeaningName}:
+                                            </h4>
+                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                                                {staticImageMeaningData[selectedImageMeaningName].images.map((imgSrc, index) => (
+                                                    <img key={index} src={imgSrc} alt={`Visual for ${selectedImageMeaningName}`} className="w-full h-auto rounded-lg shadow-md" />
+                                                ))}
+                                            </div>
+                                            <p className="whitespace-pre-wrap">{staticImageMeaningData[selectedImageMeaningName].interpretation}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Activity 4: Phonetic Analysis of Name */}
+                                <div className="bg-white rounded-xl shadow-lg p-6 border border-orange-200 text-center">
+                                    <h3 className="text-2xl font-bold text-orange-700 mb-4 border-b pb-2 font-cairo-display">
+                                        🎵 التحليل الصوتي للاسم 🎵
+                                    </h3>
+                                    <p className="text-gray-700 mb-6">
+                                        اختاروا اسماً واكتشفوا إيقاعه وتدفقه وتأثيره الصوتي:
+                                    </p>
+                                    <div className="flex flex-wrap justify-center gap-4 mb-6">
+                                        {nameKeys.map(name => (
+                                            <button
+                                                key={`phonetic-${name}`}
+                                                onClick={() => handleShowPhoneticAnalysis(name)}
+                                                className="bg-yellow-100 text-yellow-800 font-bold py-3 px-6 rounded-full shadow-md hover:bg-yellow-200 transition-colors transform hover:scale-105"
+                                            >
+                                                {name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {selectedPhoneticAnalysisName && staticPhoneticAnalysis[selectedPhoneticAnalysisName] && (
+                                        <div className="mt-4 bg-orange-50 p-4 rounded-lg text-base text-gray-800 border border-orange-200 animate-fadeIn text-right">
+                                            <h4 className="font-semibold text-orange-700 mb-2 border-b border-orange-300 pb-1 font-cairo-display">
+                                                تحليل صوتي لاسم {selectedPhoneticAnalysisName}:
+                                            </h4>
+                                            <p><span className="font-semibold">الإيقاع:</span> {staticPhoneticAnalysis[selectedPhoneticAnalysisName].vibration}</p>
+                                            <p><span className="font-semibold">التدفق:</span> {staticPhoneticAnalysis[selectedPhoneticAnalysisName].flow}</p>
+                                            <p><span className="font-semibold">التأثير:</span> {staticPhoneticAnalysis[selectedPhoneticAnalysisName].impact}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </section>
                     )}
 
@@ -1058,10 +1447,11 @@ function App() {
                                 مقارنة وتقييم الأسماء
                             </h2>
                             <p className="text-center text-gray-600 italic mb-6">
-                                (مقارنة سريعة لأبرز الجوانب بين الأسماء.)
+                                (اختبرا حدسكما ومعرفتكما بالأسماء من خلال ألعابنا الممتعة!)
                             </p>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {/* Comparison Data Cards (kept as requested) */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
                                 {sortedComparisonData.map((nameComp) => (
                                     <div key={nameComp.name} className="bg-white rounded-xl shadow-lg p-6 border border-purple-200 flex flex-col items-center text-center transform transition-transform duration-300 hover:scale-105 hover:shadow-2xl">
                                         <h3 className="text-3xl font-bold text-indigo-800 mb-4 font-cairo-display">{nameComp.name}</h3>
@@ -1086,230 +1476,173 @@ function App() {
                                 ))}
                             </div>
 
-                            <div className="bg-white rounded-xl shadow-lg p-6 border border-teal-200 mt-8">
-                                <h3 className="text-2xl font-bold text-teal-700 mb-4 border-b pb-2 font-cairo-display">
-                                    نشاط: أي اسم يوحي بأي مشاعر؟
-                                </h3>
-                                <p className="text-gray-700 mb-4">
-                                    اختارا الاسم الذي تشعران أنه ينسجم مع كل من هذه المشاعر أو الصفات:
-                                </p>
-                                <div className="space-y-4">
-                                    {['القوة والشجاعة', 'الهدوء والسكينة', 'البركة والخير', 'العطاء والمساعدة'].map(vibe => (
-                                        <div key={vibe} className="flex flex-col sm:flex-row items-center sm:items-baseline">
-                                            <span className="font-semibold text-indigo-600 w-full sm:w-1/3 mb-2 sm:mb-0">{vibe}:</span>
-                                            <div className="flex-grow flex flex-wrap gap-2 justify-center sm:justify-start">
-                                                {nameKeys.map(name => (
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mt-10">
+                                {/* Game 1: Name-Trait Matching Game */}
+                                <div className="bg-white rounded-xl shadow-lg p-6 border border-purple-200 text-center flex flex-col justify-between items-center">
+                                    <h3 className="text-2xl font-bold text-purple-700 mb-4 font-cairo-display">
+                                        لعبة: أي اسم يناسب الصفة؟ 🤔
+                                    </h3>
+                                    <p className="text-gray-700 mb-4">
+                                        هل يمكنكما مطابقة الصفة الصحيحة لكل اسم من أسمائنا المقترحة؟
+                                    </p>
+                                    {!traitGameStarted ? (
+                                        <button
+                                            onClick={startTraitGame}
+                                            className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-purple-300"
+                                        >
+                                            ابدأ اللعبة!
+                                        </button>
+                                    ) : (
+                                        <div className="w-full mt-4 animate-fadeInUp">
+                                            <p className="text-lg font-semibold text-gray-800 mb-2">
+                                                النتيجة: {traitGameScore} / {currentTraitIndex}
+                                            </p>
+                                            <h4 className="text-2xl font-bold text-indigo-700 mb-6 font-cairo-display">
+                                                الصفة: "{traitQuestions[currentTraitIndex]?.trait}"
+                                            </h4>
+                                            <div className="flex flex-wrap justify-center gap-3">
+                                                {nameKeys.map((name, idx) => (
                                                     <button
-                                                        key={`${vibe}-${name}`}
-                                                        onClick={() => handleNameVibeSubmission(name, vibe)}
-                                                        className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${vibeChosenCounts[name] && vibeChosenCounts[name][vibe] ? 'bg-indigo-600 text-white shadow-lg' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                                                        key={idx}
+                                                        onClick={() => handleTraitAnswer(name)}
+                                                        className="bg-blue-100 text-blue-800 py-2 px-4 rounded-full text-lg font-semibold hover:bg-blue-200 transition-colors shadow-sm"
+                                                        disabled={traitGameFeedback !== ''} // Disable buttons while feedback is showing
                                                     >
-                                                        {name} {vibeChosenCounts[name] && vibeChosenCounts[name][vibe] ? `(${vibeChosenCounts[name][vibe]})` : ''}
+                                                        {name}
                                                     </button>
                                                 ))}
                                             </div>
-                                        </div>
-                                    ))}
-                                </div>
-                                <p className="text-sm text-gray-600 italic mt-4">
-                                    (هذا النشاط لمجرد المتعة والتفكير في دلالات الأسماء. يتم حفظ اختياركما محلياً.)
-                                </p>
-                            </div>
-                        </section>
-                    )}
-
-                    {activeTab === 'voting' && (
-                        <section className="animate-fadeIn">
-                            <h2 className="text-3xl font-bold text-center text-indigo-700 mb-8 border-b-2 border-indigo-400 pb-4 font-cairo-display">
-                                تصويت الوالدين وآراؤهم
-                            </h2>
-                            {currentUser && firebaseEnabled && (
-                                <p className="text-center text-gray-600 mb-4">
-                                    معرف المستخدم الخاص بك: <span className="font-mono text-sm bg-gray-200 p-1 rounded">{currentUser.uid.substring(0, 8)}...</span>
-                                </p>
-                            )}
-                             {!firebaseEnabled && (
-                                <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded-lg relative mb-4 w-full text-center shadow-md">
-                                    <span className="block sm:inline">وظائف التصويت والتعليق غير نشطة. يرجى إعداد Firebase لتفعيلها.</span>
-                                </div>
-                            )}
-
-                            <div className="bg-white rounded-xl shadow-lg p-6 border border-teal-300 mb-8 text-center">
-                                <h3 className="text-2xl font-bold text-teal-700 mb-4 font-cairo-display">من يصوّت؟</h3>
-                                <div className="flex flex-wrap justify-center gap-4 mb-4">
-                                    <label className="flex items-center space-x-2 cursor-pointer bg-blue-100 p-3 rounded-lg hover:bg-blue-200 transition-colors shadow">
-                                        <input
-                                            type="radio"
-                                            name="userRole"
-                                            value="father"
-                                            checked={userRole === 'father'}
-                                            onChange={() => handleUserRoleChange('father')}
-                                            className="form-radio h-5 w-5 text-blue-600"
-                                            disabled={!firebaseEnabled}
-                                        />
-                                        <span className="text-lg font-semibold text-blue-800">👨‍🦰 الأب (محمد)</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 cursor-pointer bg-pink-100 p-3 rounded-lg hover:bg-pink-200 transition-colors shadow">
-                                        <input
-                                            type="radio"
-                                            name="userRole"
-                                            value="mother"
-                                            checked={userRole === 'mother'}
-                                            onChange={() => handleUserRoleChange('mother')}
-                                            className="form-radio h-5 w-5 text-pink-600"
-                                            disabled={!firebaseEnabled}
-                                        />
-                                        <span className="text-lg font-semibold text-pink-800">👩‍🦰 الأم (خلود)</span>
-                                    </label>
-                                    <label className="flex items-center space-x-2 cursor-pointer bg-gray-100 p-3 rounded-lg hover:bg-gray-200 transition-colors shadow">
-                                        <input
-                                            type="radio"
-                                            name="userRole"
-                                            value="guest"
-                                            checked={userRole === 'guest'}
-                                            onChange={() => handleUserRoleChange('guest')}
-                                            className="form-radio h-5 w-5 text-gray-600"
-                                            disabled={!firebaseEnabled}
-                                        />
-                                        <span className="text-lg font-semibold text-gray-800">👤 زائر (مجهول)</span>
-                                    </label>
-                                    {userRole === 'guest' && (
-                                        <div className="w-full md:w-auto mt-4">
-                                            <input
-                                                type="text"
-                                                className="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-purple-500 focus:border-purple-500"
-                                                placeholder="أدخل اسمك (اختياري)"
-                                                value={userName === 'مستخدم مجهول' ? '' : userName}
-                                                onChange={(e) => handleUserRoleChange('custom', e.target.value)}
-                                                disabled={!firebaseEnabled}
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                                <p className="text-sm text-gray-600 mt-2">
-                                    (سيتم حفظ اختياركما لتسهيل التصويت والتعليق لاحقاً.)
-                                </p>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
-                                {Object.keys(nameDetails).map(name => (
-                                    <div key={name} className="bg-white rounded-xl shadow-lg p-5 text-center transform transition-transform duration-300 hover:scale-105 hover:shadow-xl border border-indigo-200 flex flex-col justify-between">
-                                        <div>
-                                            <h3 className="text-2xl font-bold text-indigo-800 mb-3 font-cairo-display">{name}</h3>
-                                            <p className="text-gray-600 mb-4 text-sm">{nameDetails[name].meaning}</p>
-                                        </div>
-                                        <div>
-                                            <button
-                                                onClick={() => handleVote(name)}
-                                                className="w-full bg-gradient-to-r from-green-500 to-teal-600 hover:from-green-600 hover:to-teal-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-green-300 mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
-                                                disabled={!firebaseEnabled}
-                                            >
-                                                صوّت لهذا الاسم
-                                            </button>
-                                            <p className="mt-4 text-xl font-bold text-blue-700">
-                                                الأصوات: <span className="text-3xl text-indigo-700">{votes[name]}</span>
-                                            </p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div className="bg-white rounded-xl shadow-lg p-6 border border-teal-200 mt-8">
-                                <h3 className="text-2xl font-bold text-teal-700 mb-4 border-b pb-2 font-cairo-display">
-                                    مخطط الأصوات الحالي
-                                </h3>
-                                <div className="flex flex-col space-y-4">
-                                    {Object.keys(votes).map(name => {
-                                        const totalVotes = Object.values(votes).reduce((sum, current) => sum + current, 0);
-                                        const percentage = totalVotes > 0 ? (votes[name] / totalVotes) * 100 : 0;
-                                        return (
-                                            <div key={name} className="flex items-center">
-                                                <span className="w-24 text-right font-semibold text-gray-700 font-cairo-display">{name}:</span>
-                                                <div className="flex-grow bg-gray-200 rounded-full h-8 ml-4 relative overflow-hidden">
-                                                    <div
-                                                        className="bg-gradient-to-r from-blue-400 to-indigo-600 h-full rounded-full transition-all duration-500 ease-out flex items-center justify-end pr-2"
-                                                        style={{ width: `${percentage}%` }}
-                                                    >
-                                                        <span className="text-white font-bold text-sm">
-                                                            {percentage.toFixed(0)}%
-                                                        </span>
-                                                    </div>
-                                                    {percentage < 50 && (
-                                                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-700 font-bold text-sm">
-                                                            {votes[name]} صوت
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                                <p className="text-sm text-gray-600 mt-4 text-center">
-                                    العدد الكلي للأصوات: <span className="font-bold">{Object.values(votes).reduce((sum, current) => sum + current, 0)}</span>
-                                </p>
-                            </div>
-
-                            <div className="bg-white rounded-xl shadow-lg p-6 border border-purple-200 mt-8">
-                                <h3 className="text-2xl font-bold text-purple-700 mb-4 border-b pb-2 font-cairo-display">
-                                    شاركا آراءكما
-                                </h3>
-                                <textarea
-                                    className="w-full p-3 border border-gray-300 rounded-lg mb-3 focus:ring-2 focus:ring-purple-400 outline-none resize-y min-h-[100px] disabled:opacity-50 disabled:bg-gray-100"
-                                    placeholder="اكتبي أو اكتبي رأيكما حول الأسماء أو عملية الاختيار..."
-                                    value={newComment}
-                                    onChange={(e) => setNewComment(e.target.value)}
-                                    disabled={!firebaseEnabled}
-                                ></textarea>
-                                <button
-                                    onClick={handleAddComment}
-                                    className="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-purple-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    disabled={!firebaseEnabled}
-                                >
-                                    إضافة رأي
-                                </button>
-                                <div className="mt-6 space-y-4">
-                                    {comments.length > 0 ? (
-                                        comments.map((comment) => (
-                                            <div key={comment.id} className="bg-gray-100 p-4 rounded-lg shadow-sm border-l-4 border-purple-300 animate-fadeIn">
-                                                <p className="font-semibold text-indigo-600">
-                                                    {comment.userName} ({comment.role === 'father' ? 'الأب' : (comment.role === 'mother' ? 'الأم' : 'زائر')}):
+                                            {traitGameFeedback && (
+                                                <p className={`mt-4 text-lg font-semibold ${traitGameFeedback.includes('صحيحة') ? 'text-green-600' : 'text-red-600'} animate-pulse`}>
+                                                    {traitGameFeedback}
                                                 </p>
-                                                <p className="text-gray-800 mt-1">{comment.text}</p>
-                                                {comment.timestamp && (
-                                                    <p className="text-xs text-gray-500 mt-2 text-left">
-                                                        {new Date(comment.timestamp.toDate()).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' })}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <p className="text-center text-gray-500 italic">لا توجد آراء حتى الآن. كونا أول من يشارك!</p>
+                                            )}
+                                            {currentTraitIndex === traitQuestions.length && (
+                                                <div className="mt-6 bg-green-50 p-4 rounded-lg border border-green-300">
+                                                    <h5 className="text-xl font-bold text-green-700 mb-2">انتهت اللعبة!</h5>
+                                                    <p className="text-lg text-gray-800">أحرزتما: <span className="font-bold text-2xl">{traitGameScore}</span> من {traitQuestions.length}</p>
+                                                    <button
+                                                        onClick={resetTraitGame}
+                                                        className="mt-4 bg-purple-500 text-white py-2 px-4 rounded-full hover:bg-purple-600 transition-colors"
+                                                    >
+                                                        العب مرة أخرى
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
                                     )}
                                 </div>
-                            </div>
 
-                            <div className="bg-white rounded-xl shadow-lg p-6 border border-blue-200 mt-8">
-                                <h3 className="text-2xl font-bold text-blue-700 mb-4 border-b pb-2 font-cairo-display">
-                                    💭 رؤيتكما لاسم المستقبل:
-                                </h3>
-                                <p className="text-gray-700 mb-4">
-                                    تخيلوا معنا: لو اخترتما اسماً لطفلكما، كيف تتصوران حياته المستقبلية بهذا الاسم؟ شاركا رؤيتكما:
-                                </p>
-                                <textarea
-                                    className="w-full p-3 border border-gray-300 rounded-lg mb-3 focus:ring-2 focus:ring-blue-400 outline-none resize-y min-h-[80px]"
-                                    placeholder="أتخيل أن [الاسم] سيكون..."
-                                    value={nameVibeInput}
-                                    onChange={(e) => {
-                                        setNameVibeInput(e.target.value);
-                                        localStorage.setItem('nameVibeInput', e.target.value);
-                                    }}
-                                ></textarea>
-                                <button
-                                    onClick={() => showTemporaryMessage("شكراً لمشاركتكما رؤيتكما المستقبلية الملهمة!", 'success')}
-                                    className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300"
-                                >
-                                    شارك الرؤية
-                                </button>
+                                {/* Game 2: Name Story Completion Game */}
+                                <div className="bg-white rounded-xl shadow-lg p-6 border border-teal-200 text-center flex flex-col justify-between items-center">
+                                    <h3 className="text-2xl font-bold text-teal-700 mb-4 font-cairo-display">
+                                        لعبة: أكمل القصة بالاسم الصحيح 📚
+                                    </h3>
+                                    <p className="text-gray-700 mb-4">
+                                        اقرأا جزءاً من القصة، وخمّنا الاسم الذي يكملها بشكل أفضل!
+                                    </p>
+                                    {!storyGameStarted ? (
+                                        <button
+                                            onClick={startStoryGame}
+                                            className="bg-gradient-to-r from-teal-500 to-blue-600 hover:from-teal-600 hover:to-blue-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-teal-300"
+                                        >
+                                            ابدأ اللعبة!
+                                        </button>
+                                    ) : (
+                                        <div className="w-full mt-4 animate-fadeInUp">
+                                            <p className="text-lg font-semibold text-gray-800 mb-2">
+                                                النتيجة: {storyGameScore} / {currentStoryIndex}
+                                            </p>
+                                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-6 text-right">
+                                                <p className="text-xl font-medium text-gray-800">
+                                                    "{storyQuestions[currentStoryIndex]?.storyPart}"
+                                                </p>
+                                                <p className="text-lg text-gray-600 mt-2">
+                                                    ...فمن هو يا ترى؟
+                                                </p>
+                                            </div>
+                                            <div className="flex flex-wrap justify-center gap-3">
+                                                {nameKeys.map((name, idx) => (
+                                                    <button
+                                                        key={idx}
+                                                        onClick={() => handleStoryAnswer(name)}
+                                                        className="bg-purple-100 text-purple-800 py-2 px-4 rounded-full text-lg font-semibold hover:bg-purple-200 transition-colors shadow-sm"
+                                                        disabled={storyGameFeedback !== ''} // Disable buttons while feedback is showing
+                                                    >
+                                                        {name}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            {storyGameFeedback && (
+                                                <p className={`mt-4 text-lg font-semibold ${storyGameFeedback.includes('صحيحة') ? 'text-green-600' : 'text-red-600'} animate-pulse`}>
+                                                    {storyGameFeedback}
+                                                </p>
+                                            )}
+                                            {currentStoryIndex === storyQuestions.length && (
+                                                <div className="mt-6 bg-green-50 p-4 rounded-lg border border-green-300">
+                                                    <h5 className="text-xl font-bold text-green-700 mb-2">انتهت اللعبة!</h5>
+                                                    <p className="text-lg text-gray-800">أحرزتما: <span className="font-bold text-2xl">{storyGameScore}</span> من {storyQuestions.length}</p>
+                                                    <button
+                                                        onClick={resetStoryGame}
+                                                        className="mt-4 bg-purple-500 text-white py-2 px-4 rounded-full hover:bg-purple-600 transition-colors"
+                                                    >
+                                                        العب مرة أخرى
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Game 3: Name Memory Challenge */}
+                                <div className="bg-white rounded-xl shadow-lg p-6 border border-orange-200 text-center flex flex-col justify-between items-center">
+                                    <h3 className="text-2xl font-bold text-orange-700 mb-4 font-cairo-display">
+                                        تحدي الذاكرة الاسمية 🧠
+                                    </h3>
+                                    <p className="text-gray-700 mb-4">
+                                        اعثرا على أزواج الاسم والمعنى المخفية!
+                                    </p>
+                                    {!memoryGameStarted ? (
+                                        <button
+                                            onClick={startMemoryGame}
+                                            className="bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-orange-300"
+                                        >
+                                            ابدأ التحدي!
+                                        </button>
+                                    ) : (
+                                        <div className="w-full mt-4 animate-fadeInUp">
+                                            <p className="text-lg font-semibold text-gray-800 mb-4">النقلات: {moves}</p>
+                                            <div className="grid grid-cols-3 gap-3 justify-center">
+                                                {memoryCards.map(card => (
+                                                    <button
+                                                        key={card.uniqueId}
+                                                        onClick={() => handleCardClick(card)}
+                                                        className={`w-full h-24 sm:h-32 rounded-lg flex items-center justify-center text-xl font-bold transition-all duration-300 shadow-md
+                                                            ${card.isMatched ? 'bg-green-200 text-green-800 opacity-60' :
+                                                              card.isFlipped ? 'bg-blue-300 text-blue-900' : 'bg-gray-300 hover:bg-gray-400 text-gray-800'}`}
+                                                        disabled={card.isMatched || (flippedCards.length === 2 && !card.isFlipped)}
+                                                    >
+                                                        {card.isFlipped || card.isMatched ? (card.vibe ? card.vibe : card.name) : '؟'}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            {memoryGameMessage && (
+                                                <p className={`mt-4 text-lg font-semibold ${memoryGameMessage.includes('صحيحة') || memoryGameMessage.includes('رائع') ? 'text-green-600' : 'text-red-600'} animate-pulse`}>
+                                                    {memoryGameMessage}
+                                                </p>
+                                            )}
+                                            {matchedCards.length === memoryCards.length && (
+                                                <button
+                                                    onClick={resetMemoryGame}
+                                                    className="mt-6 bg-purple-500 text-white py-2 px-5 rounded-full hover:bg-purple-600 transition-colors shadow-md"
+                                                >
+                                                    العب مرة أخرى
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </section>
                     )}
@@ -1320,7 +1653,7 @@ function App() {
                                 ألعاب مسلية لمساعدتكما في الاختيار!
                             </h2>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                {/* Name Quiz Game Card */}
+                                {/* Ideal Name Quiz Card */}
                                 <div className="bg-white rounded-xl shadow-lg p-6 border border-red-200 text-center flex flex-col justify-between items-center">
                                     <h3 className="text-2xl font-bold text-red-700 mb-4 font-cairo-display">
                                         اختبار الاسم المثالي
@@ -1382,76 +1715,23 @@ function App() {
                                     )}
                                 </div>
 
-                                {/* Name Vibe Matching Game Card */}
+                                {/* New Game: Name Dice Roll */}
                                 <div className="bg-white rounded-xl shadow-lg p-6 border border-blue-200 text-center flex flex-col justify-between items-center">
                                     <h3 className="text-2xl font-bold text-blue-700 mb-4 font-cairo-display">
-                                        لعبة مطابقة الإحساس بالاسم
+                                        🎲 حجر النرد الاسمية 🎲
                                     </h3>
                                     <p className="text-gray-700 mb-4">
-                                        هل يمكنكما مطابقة الصفة الصحيحة لكل اسم؟ اختبروا معرفتكم!
+                                        دحرجا النرد ليختار اسماً عشوائياً لمولودكما! (للمتعة فقط!)
                                     </p>
-                                    {!vibeGameStarted && (
-                                        <button
-                                            onClick={startVibeGame}
-                                            className="bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300"
-                                        >
-                                            ابدأ اللعبة!
-                                        </button>
-                                    )}
-
-                                    {vibeGameStarted && vibeGameCurrentName && (
-                                        <div className="w-full mt-4 animate-fadeInUp">
-                                            <p className="text-lg font-semibold text-gray-800 mb-2">
-                                                النتيجة: {vibeGameScore} / {Object.keys(vibeGameMatches).length}
-                                            </p>
-                                            <h4 className="text-3xl font-bold text-indigo-700 mb-6 font-cairo-display">
-                                                {vibeGameCurrentName}
-                                            </h4>
-                                            <p className="text-gray-600 mb-4">اختر الصفة التي تناسب الاسم:</p>
-                                            <div className="flex flex-wrap justify-center gap-3">
-                                                {vibeGameOptions.map((vibe, idx) => (
-                                                    <button
-                                                        key={idx}
-                                                        onClick={() => handleVibeMatch(vibe)}
-                                                        className="bg-purple-100 text-purple-800 py-2 px-4 rounded-full text-lg font-semibold hover:bg-purple-200 transition-colors shadow-sm"
-                                                    >
-                                                        {vibe}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {vibeGameStarted && !vibeGameCurrentName && (
-                                        <div className="w-full mt-4 bg-green-50 p-6 rounded-lg border border-green-300 animate-fadeIn">
-                                            <h4 className="text-2xl font-bold text-green-700 mb-4 font-cairo-display">
-                                                انتهت اللعبة!
-                                            </h4>
-                                            <p className="text-lg text-gray-800 mb-4">
-                                                أحرزتما: <span className="text-blue-600 font-bold text-3xl">{vibeGameScore}</span> من {vibeGameNames.length}
-                                            </p>
-                                            <div className="text-left text-gray-700 mt-4">
-                                                <h5 className="font-semibold text-purple-700 mb-2 font-cairo-display">ملخص الإجابات:</h5>
-                                                {Object.keys(vibeGameMatches).map(name => (
-                                                    <p key={name} className="mb-1">
-                                                        <span className="font-bold text-indigo-600">{name}:</span> اخترتما
-                                                        <span className={`font-semibold ${vibeDefinitions[name].includes(vibeGameMatches[name][0]) ? 'text-green-600' : 'text-red-600'}`}>
-                                                            {" " + vibeGameMatches[name][0]}
-                                                        </span>. الصحيح هو
-                                                        <span className="font-semibold text-green-600">
-                                                            {" " + vibeDefinitions[name].join(', ')}
-                                                        </span>.
-                                                    </p>
-                                                ))}
-                                            </div>
-                                            <button
-                                                onClick={resetVibeGame}
-                                                className="mt-6 bg-purple-500 text-white py-2 px-5 rounded-full hover:bg-purple-600 transition-colors shadow-md"
-                                            >
-                                                العب مرة أخرى
-                                            </button>
-                                        </div>
-                                    )}
+                                    <button
+                                        onClick={handleDiceRoll}
+                                        className="bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300"
+                                    >
+                                        دحرج النرد!
+                                    </button>
+                                    <p className="text-sm text-gray-600 mt-4 italic">
+                                        (سيظهر الاسم المختار في رسالة مؤقتة أعلى الشاشة.)
+                                    </p>
                                 </div>
                             </div>
                         </section>
@@ -1558,6 +1838,59 @@ function App() {
                                     </p>
                                 </div>
 
+                                {/* New Activity 1: Parents' Pledge to Baby */}
+                                <div className="bg-white rounded-xl shadow-lg p-6 border border-pink-200 mt-8">
+                                    <h3 className="text-2xl font-bold text-pink-700 mb-4 border-b pb-2 font-cairo-display">
+                                        📝 تعهد الآباء لمولودهم المستقبلي 📝
+                                    </h3>
+                                    <p className="text-gray-700 mb-4">
+                                        اكتبي تعهداً أو وعداً لطفلكما المستقبلي. ما هي القيم التي ستغرسانها فيه؟
+                                    </p>
+                                    <textarea
+                                        className="w-full p-3 border border-gray-300 rounded-lg mb-3 focus:ring-2 focus:ring-pink-400 outline-none resize-y min-h-[120px]"
+                                        placeholder="أتعهد لطفلي بأنني سأكون..."
+                                        value={parentsPledge}
+                                        onChange={(e) => setParentsPledge(e.target.value)}
+                                    ></textarea>
+                                    <button
+                                        onClick={handlePledgeSave}
+                                        className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-pink-300"
+                                    >
+                                        حفظ التعهد
+                                    </button>
+                                </div>
+
+                                {/* New Activity 2: Lullaby for Baby Name */}
+                                <div className="bg-white rounded-xl shadow-lg p-6 border border-orange-200 mt-8">
+                                    <h3 className="text-2xl font-bold text-orange-700 mb-4 border-b pb-2 font-cairo-display">
+                                        🎶 أغنية المهد لاسم مولودكما 🎶
+                                    </h3>
+                                    <p className="text-gray-700 mb-4">
+                                        اختاروا اسماً، واعرضوا أغنية مهد جميلة مخصصة له!
+                                    </p>
+                                    <div className="flex flex-wrap justify-center gap-4 mb-4">
+                                        {nameKeys.map(name => (
+                                            <button
+                                                key={`lullaby-${name}`}
+                                                onClick={() => {
+                                                    const lullaby = getStaticContent('lullaby', name);
+                                                    if (lullaby) {
+                                                        showTemporaryMessage(`أغنية مهد لاسم ${name}:\n\n${lullaby}`, 'info', 7000); // Show for longer
+                                                    } else {
+                                                        showTemporaryMessage("لا توجد أغنية مهد لهذا الاسم.", 'info');
+                                                    }
+                                                }}
+                                                className="bg-yellow-100 text-yellow-800 font-bold py-3 px-6 rounded-full shadow-md hover:bg-yellow-200 transition-colors transform hover:scale-105"
+                                            >
+                                                {name}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <p className="text-sm text-gray-600 italic mt-2">
+                                        (سيظهر الأغنية كرسالة مؤقتة على الشاشة.)
+                                    </p>
+                                </div>
+
                                 <p className="text-gray-700 leading-relaxed mt-6 italic font-semibold">
                                     أتمنى لكما ولطفلكما القادم كل الخير والبركة والسعادة في هذه الرحلة الرائعة.
                                     <br />
@@ -1571,7 +1904,123 @@ function App() {
 
                     {activeTab === 'recommendation' && (
                         <section className="animate-fadeIn">
-                            <Recommendation />
+                            <Recommendation /> {/* Display the main recommendation component */}
+
+                            {/* New Activity 1: Design Your Baby's Future Vision */}
+                            <div className="bg-white rounded-xl shadow-lg p-6 border border-indigo-200 mt-8 text-center">
+                                <h3 className="text-2xl font-bold text-indigo-700 mb-4 border-b pb-2 font-cairo-display">
+                                    🌟 صمم رؤية لمستقبل مولودك 🌟
+                                </h3>
+                                <p className="text-gray-700 mb-6">
+                                    صمموا رؤية شخصية لمستقبل طفلكما بناءً على الاسم المختار والصفات التي تحلمان بها!
+                                </p>
+                                <div className="space-y-4 text-right">
+                                    <div>
+                                        <label htmlFor="futureVisionNameInput" className="block text-gray-700 font-semibold mb-1">الاسم المقترح:</label>
+                                        <input
+                                            type="text"
+                                            id="futureVisionNameInput"
+                                            className="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-right"
+                                            value={futureVisionNameInput}
+                                            onChange={(e) => setFutureVisionNameInput(e.target.value)}
+                                            placeholder="اكتبي اسم المولود..."
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-gray-700 font-semibold mb-2">أهم 3 صفات نتمنى وجودها:</label>
+                                        <div className="flex flex-wrap justify-end gap-2">
+                                            {['شجاع', 'حنون', 'ذكي', 'مبتكر', 'متفائل', 'عطاء', 'قيادي', 'صبور'].map(trait => (
+                                                <button
+                                                    key={trait}
+                                                    onClick={() => {
+                                                        setFutureVisionTraits(prev =>
+                                                            prev.includes(trait)
+                                                                ? prev.filter(t => t !== trait)
+                                                                : (prev.length < 3 ? [...prev, trait] : prev) // Limit to 3 traits
+                                                        );
+                                                    }}
+                                                    className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 ${futureVisionTraits.includes(trait) ? 'bg-indigo-600 text-white shadow-lg' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                                                >
+                                                    {trait}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-1">اختر 3 صفات كحد أقصى.</p>
+                                    </div>
+                                    <div>
+                                        <label htmlFor="futureVisionMotto" className="block text-gray-700 font-semibold mb-1">شعار حياة له (اختياري):</label>
+                                        <input
+                                            type="text"
+                                            id="futureVisionMotto"
+                                            className="w-full p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 text-right"
+                                            value={futureVisionMotto}
+                                            onChange={(e) => setFutureVisionMotto(e.target.value)}
+                                            placeholder="مثال: 'بالعطاء نحيا، وبالفرح ننمو'"
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={handleGenerateFutureVision}
+                                        className="w-full bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-blue-300 mt-4"
+                                    >
+                                        توليد وثيقة الرؤية
+                                    </button>
+                                </div>
+
+                                {generatedFutureVision && (
+                                    <div className="mt-8 bg-blue-50 p-6 rounded-lg text-gray-800 border border-blue-200 text-right animate-fadeIn">
+                                        <h4 className="font-semibold text-blue-700 mb-4 border-b border-blue-300 pb-2 font-cairo-display">وثيقة رؤية مستقبلية لطفلكما:</h4>
+                                        <p className="whitespace-pre-wrap leading-loose">{generatedFutureVision}</p>
+                                        <button
+                                            onClick={() => {
+                                                const el = document.createElement('textarea');
+                                                el.value = generatedFutureVision;
+                                                document.body.appendChild(el);
+                                                el.select();
+                                                document.execCommand('copy');
+                                                document.body.removeChild(el);
+                                                showTemporaryMessage("تم نسخ الرؤية بنجاح!", 'success');
+                                            }}
+                                            className="bg-green-500 text-white py-2 px-4 rounded-full text-sm font-semibold hover:bg-green-600 transition-colors shadow-md mt-4"
+                                        >
+                                            نسخ الرؤية
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* New Activity 2: AI Baby Visualization */}
+                            <div className="bg-white rounded-xl shadow-lg p-6 border border-teal-200 mt-8 text-center">
+                                <h3 className="text-2xl font-bold text-teal-700 mb-4 border-b pb-2 font-cairo-display">
+                                    👶 تصور مولودكما بالذكاء الاصطناعي 👶
+                                </h3>
+                                <p className="text-gray-700 mb-6">
+                                    اختاروا اسماً وشاهدوا "تصوراً فنياً" لجوهر طفل يحمل هذا الاسم، مستوحى من الذكاء الاصطناعي!
+                                </p>
+                                <div className="flex flex-wrap justify-center gap-4 mb-6">
+                                    {nameKeys.map(name => (
+                                        <button
+                                            key={`ai-viz-${name}`}
+                                            onClick={() => handleAIVisualization(name)}
+                                            className="bg-teal-100 text-teal-800 font-bold py-3 px-6 rounded-full shadow-md hover:bg-teal-200 transition-colors transform hover:scale-105"
+                                        >
+                                            {name}
+                                        </button>
+                                    ))}
+                                </div>
+                                {selectedAIVisualizationName && staticAIVisualizations[selectedAIVisualizationName] && (
+                                    <div className="mt-4 bg-teal-50 p-4 rounded-lg text-base text-gray-800 border border-teal-200 animate-fadeIn">
+                                        <h4 className="font-semibold text-teal-700 mb-2 border-b border-teal-300 pb-1 font-cairo-display">
+                                            تصور لاسم {selectedAIVisualizationName}:
+                                        </h4>
+                                        <img
+                                            src={staticAIVisualizations[selectedAIVisualizationName].image}
+                                            alt={`AI visualization for ${selectedAIVisualizationName}`}
+                                            className="w-full h-auto rounded-lg shadow-md mb-4"
+                                        />
+                                        <p className="whitespace-pre-wrap">{staticAIVisualizations[selectedAIVisualizationName].description}</p>
+                                    </div>
+                                )}
+                            </div>
                         </section>
                     )}
                 </main>
@@ -1596,10 +2045,10 @@ function App() {
                     </button>
                 </footer>
             </div>
-            {/* Tone.js CDN script included directly for global access in the React component.
-                This is a workaround for Canvas environment where we can't control index.html head.
-                In a real React project, this would be imported or loaded differently. */}
+            {/* Tone.js CDN script is commented out as the related feature was removed.
+                If needed in the future, it should be reconsidered based on environment compatibility.
             <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+            */}
             {/* Tailwind CSS CDN is assumed to be available or managed by the embedding environment.
                 For standalone HTML, this would be in the <head>. */}
             <script src="https://cdn.tailwindcss.com"></script>
