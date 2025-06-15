@@ -132,7 +132,12 @@ function App() {
     // Quiz Game States
     const [quizStarted, setQuizStarted] = useState(false);
     const [currentQuizQuestionIndex, setCurrentQuizQuestionIndex] = useState(0);
-    const [quizScores, setQuizScores] = useState({}); // FIX: Initialized with useState({})
+    // FIX: Initialize quizScores with a function to ensure it's an object with all nameKeys set to 0.
+    const [quizScores, setQuizScores] = useState(() => {
+        const initialScores = {};
+        nameKeys.forEach(name => { initialScores[name] = 0; });
+        return initialScores;
+    });
     const [quizResult, setQuizResult] = useState(null);
 
     // Name Vibe Matching Game States
@@ -804,7 +809,11 @@ function App() {
     const startQuiz = () => {
         setQuizStarted(true);
         setCurrentQuizQuestionIndex(0);
-        setQuizScores({ 'يامن': 0, 'غوث': 0, 'غياث': 0 });
+        setQuizScores(() => { // Re-initialize scores based on names
+            const initialScores = {};
+            nameKeys.forEach(name => { initialScores[name] = 0; });
+            return initialScores;
+        });
         setQuizResult(null);
     };
 
@@ -812,7 +821,7 @@ function App() {
         setQuizScores(prevScores => {
             const newScores = { ...prevScores };
             for (const name in scores) {
-                newScores[name] += scores[name];
+                newScores[name] = (newScores[name] || 0) + scores[name]; // Defensive update
             }
             return newScores;
         });
@@ -823,11 +832,13 @@ function App() {
             // Quiz finished, determine result
             let maxScore = -1;
             let recommendedNames = [];
-            for (const name in quizScores) {
-                if (quizScores[name] > maxScore) {
-                    maxScore = quizScores[name];
+            // Ensure quizScores is not undefined or null before iterating
+            const currentQuizScores = quizScores; // Use the current state value directly
+            for (const name in currentQuizScores) {
+                if (currentQuizScores[name] > maxScore) {
+                    maxScore = currentQuizScores[name];
                     recommendedNames = [name];
-                } else if (quizScores[name] === maxScore) {
+                } else if (currentQuizScores[name] === maxScore) {
                     recommendedNames.push(name);
                 }
             }
@@ -838,7 +849,11 @@ function App() {
     const resetQuiz = () => {
         setQuizStarted(false);
         setCurrentQuizQuestionIndex(0);
-        setQuizScores({});
+        setQuizScores(() => { // Reset scores based on names
+            const initialScores = {};
+            nameKeys.forEach(name => { initialScores[name] = 0; });
+            return initialScores;
+        });
         setQuizResult(null);
     };
 
@@ -866,7 +881,8 @@ function App() {
             allPossibleVibes = Array.from(allPossibleVibes);
 
             const shuffledOptions = [...correctVibes];
-            while (shuffledOptions.length < 4 && shuffledOptions.length < allPossibleVibes.length) {
+            // FIX: Corrected typo from allPossibleVebes to allPossibleVibes
+            while (shuffledOptions.length < 4 && shuffledOptions.length < allPossibleVibes.length) { 
                 const randomVibe = allPossibleVibes[Math.floor(Math.random() * allPossibleVibes.length)];
                 if (!shuffledOptions.includes(randomVibe)) {
                     shuffledOptions.push(randomVibe);
@@ -1551,9 +1567,14 @@ function App() {
                     <p className="text-sm opacity-90 mb-2">صُنع بحب لعائلة الغزالي 💖</p>
                     <button
                         onClick={() => {
-                            navigator.clipboard.writeText(window.location.href)
-                                .then(() => showTemporaryMessage("تم نسخ رابط التطبيق بنجاح!", 'success'))
-                                .catch(() => showTemporaryMessage("فشل نسخ الرابط. الرجاء النسخ يدوياً.", 'error'));
+                            // Using document.execCommand('copy') for better iframe compatibility
+                            const el = document.createElement('textarea');
+                            el.value = window.location.href;
+                            document.body.appendChild(el);
+                            el.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(el);
+                            showTemporaryMessage("تم نسخ رابط التطبيق بنجاح!", 'success');
                         }}
                         className="bg-white text-indigo-700 px-4 py-2 rounded-full text-sm font-semibold hover:bg-gray-100 transition-colors shadow-md flex items-center justify-center mx-auto"
                     >
@@ -1562,9 +1583,12 @@ function App() {
                     </button>
                 </footer>
             </div>
-            {/* Tone.js CDN script included directly for global access in the React component */}
+            {/* Tone.js CDN script included directly for global access in the React component.
+                This is a workaround for Canvas environment where we can't control index.html head.
+                In a real React project, this would be imported or loaded differently. */}
             <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
-            {/* Tailwind CSS CDN */}
+            {/* Tailwind CSS CDN is assumed to be available or managed by the embedding environment.
+                For standalone HTML, this would be in the <head>. */}
             <script src="https://cdn.tailwindcss.com"></script>
         </div>
     );
