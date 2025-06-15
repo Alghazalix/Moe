@@ -133,9 +133,12 @@ function App() {
     const [quizStarted, setQuizStarted] = useState(false);
     const [currentQuizQuestionIndex, setCurrentQuizQuestionIndex] = useState(0);
     // FIX: Initialize quizScores with a function to ensure it's an object with all nameKeys set to 0.
+    // This is the line that must be present and correctly initialized!
     const [quizScores, setQuizScores] = useState(() => {
         const initialScores = {};
-        nameKeys.forEach(name => { initialScores[name] = 0; });
+        if (Array.isArray(nameKeys)) { // Defensive check to ensure nameKeys is an array
+            nameKeys.forEach(name => { initialScores[name] = 0; });
+        }
         return initialScores;
     });
     const [quizResult, setQuizResult] = useState(null);
