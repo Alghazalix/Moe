@@ -8,18 +8,22 @@ import { initializeApp } from 'firebase/app';
 const IS_CANVAS_ENVIRONMENT = typeof window.__app_id !== 'undefined';
 
 // Determine the appId for Firestore paths.
+// This ID is crucial for Firebase Firestore paths to separate data for different apps.
 const appId = IS_CANVAS_ENVIRONMENT ? window.__app_id : "alghazali-family-app-deploy";
 
 // Determine Firebase configuration.
+// This block intelligently chooses between Canvas provided config or user's environment variables.
 const firebaseConfig = IS_CANVAS_ENVIRONMENT
     ? JSON.parse(window.__firebase_config)
     : {
-        apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
-        authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
-        projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
-        storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
-        messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
-        appId: process.env.REACT_APP_FIREBASE_APP_ID
+        // Firebase configuration provided by the user from Firebase Console
+        apiKey: "AIzaSyCTs1rIH60CtdRfBK8O8iyqMgcSJoDGuAk",
+        authDomain: "alghazalifamilyapp.firebaseapp.com",
+        projectId: "alghazalifamilyapp",
+        storageBucket: "alghazalifamilyapp.firebasestorage.app",
+        messagingSenderId: "211907541440",
+        appId: "1:211907541440:web:82c313f5f17d4e91c07025",
+        measurementId: "G-VJLS5W68E7" // This is a new ID provided by the user
     };
 
 // Initialize Firebase services conditionally
@@ -47,38 +51,8 @@ if (shouldInitializeFirebase) {
     console.warn("Firebase configuration is incomplete for external deployment. Firebase functionality (votes, comments) will be mocked.");
 }
 
-// Mock Firebase services if real Firebase was not initialized
-if (!firebaseEnabled) {
-    firestoreDbInstance = {
-        collection: () => ({ addDoc: () => Promise.resolve() }),
-        doc: () => ({}),
-        getDoc: () => Promise.resolve({ exists: () => false, data: () => ({}) }),
-        setDoc: () => Promise.resolve(),
-        onSnapshot: (ref, callback) => {
-            console.log("Firestore onSnapshot mocked: No real-time updates for this instance.");
-            callback({ forEach: () => {}, docs: [] });
-            return () => console.log("Firestore onSnapshot mocked: Unsubscribed.");
-        },
-        query: (ref) => ref
-    };
-    firebaseAuthInstance = {
-        onAuthStateChanged: (callback) => {
-            console.log("Firebase Auth onAuthStateChanged mocked.");
-            callback({ uid: 'mock-user-id', isAnonymous: true });
-            return () => console.log("Firebase Auth onAuthStateChanged mocked: Unsubscribed.");
-        },
-        signInAnonymously: () => {
-            console.log("Firebase Auth signInAnonymously mocked.");
-            return Promise.resolve({ user: { uid: 'mock-user-id', isAnonymous: true } });
-        },
-        signInWithCustomToken: () => {
-            console.log("Firebase Auth signInWithCustomToken mocked.");
-            return Promise.resolve({ user: { uid: 'mock-canvas-user', isAnonymous: false } });
-        }
-    };
-}
-
 // Pre-defined static content for "AI-like" generation
+// These are used when actual AI generation is disabled (e.g., in Netlify builds).
 const staticBlessings = {
     'يامن': "تبارك الرحمن يامن، يا قرة العين ونور الدرب، لتكن حياتك مليئة باليُمن والبركات، تسعد بها القلوب وتُبهج الأرواح. اللهم اجعله مباركاً أينما كان، وسعيداً أينما حلّ، وقرة عين لوالديه.",
     'غوث': "يا غوثاً للضعيف ونصيراً للمظلوم، لتكن حياتك منارة للعون والسند، تملؤها الشجاعة والنخوة. نسأل الله أن يجعلك دائماً سبباً في إغاثة المحتاج، ومصدراً للقوة والعطاء، وسنداً لعائلتك.",
@@ -98,10 +72,12 @@ const staticSimilarNames = {
 };
 
 
-// Names, 'الغوث' is intentionally removed from nameKeys as per previous request
+// Main list of names used in the app, 'الغوث' is intentionally excluded from this list
+// as per previous requirements, it's used for analysis but not for new selections.
 const nameKeys = ['يامن', 'غوث', 'غياث'];
 
 function App() {
+    // State variables for managing UI and data
     const [activeTab, setActiveTab] = useState('analysis');
     const [showRecommendation, setShowRecommendation] = useState(false);
     const [userName, setUserName] = useState('');
@@ -117,26 +93,28 @@ function App() {
     const [tempMessage, setTempMessage] = useState('');
     const [tempMessageType, setTempMessageType] = useState('info');
 
+    // States for "AI-like" generation features (using static content for now)
     const [generatedBlessing, setGeneratedBlessing] = useState('');
     const [loadingBlessing, setLoadingBlessing] = useState(false);
     const [suggestedNamesForCard, setSuggestedNamesForCard] = useState({});
     const [loadingSuggestions, setLoadingSuggestions] = useState({});
 
+    // States for name analysis and vibe submission
     const [expandedName, setExpandedName] = useState(null);
     const [funFact, setFunFact] = useState('');
     const [nameVibeInput, setNameVibeInput] = useState(() => localStorage.getItem('nameVibeInput') || '');
-    // Storing vibe selections in localStorage for persistence, using a ref for initial load
     const initialVibeCounts = useRef(JSON.parse(localStorage.getItem('vibeChosenCounts') || '{}'));
     const [vibeChosenCounts, setVibeChosenCounts] = useState(initialVibeCounts.current);
 
     // Quiz Game States
     const [quizStarted, setQuizStarted] = useState(false);
     const [currentQuizQuestionIndex, setCurrentQuizQuestionIndex] = useState(0);
-    // FIX: Initialize quizScores with a function to ensure it's an object with all nameKeys set to 0.
-    // This is the line that must be present and correctly initialized!
+    // FIX 1: Ensure quizScores is always an object, explicitly defining the keys with initial zeros.
+    // This addresses the ESLint warning and potential runtime errors related to undefined `quizScores`.
     const [quizScores, setQuizScores] = useState(() => {
         const initialScores = {};
-        if (Array.isArray(nameKeys)) { // Defensive check to ensure nameKeys is an array
+        // Defensive check to ensure nameKeys is an array before iterating
+        if (Array.isArray(nameKeys)) {
             nameKeys.forEach(name => { initialScores[name] = 0; });
         }
         return initialScores;
@@ -160,10 +138,12 @@ function App() {
     // Ref to track if initial Firebase sign-in attempt has been made
     const initialSignInAttempted = useRef(false);
 
-    // Countdown state
-    const targetDate = React.useMemo(() => new Date('2025-06-03T00:00:00'), []); // June 3, 2025
+    // Countdown state - FIX 2: Use useMemo for targetDate to prevent re-creation on every render,
+    // which was causing the react-hooks/exhaustive-deps warning for the useEffect below.
+    const targetDate = React.useMemo(() => new Date('2025-06-03T00:00:00'), []);
     const [countdown, setCountdown] = useState({});
 
+    // Effect for countdown timer
     useEffect(() => {
         const calculateCountdown = () => {
             const now = new Date();
@@ -186,12 +166,13 @@ function App() {
         const timer = setInterval(calculateCountdown, 1000);
 
         return () => clearInterval(timer);
-    }, [targetDate]); // FIX: Added targetDate to dependency array
-
+    }, [targetDate]); // targetDate is now stable due to useMemo
 
     // Firebase Authentication & Listeners - Using useCallback to memoize and prevent infinite loops
+    // FIX 3: Removed 'firebaseEnabled' from useCallback's dependency array.
+    // ESLint indicates it's an unnecessary dependency as it's an outer scope value that doesn't trigger re-renders.
     const setupFirebaseAuth = useCallback(async () => {
-        if (!firebaseEnabled) {
+        if (!firebaseEnabled) { // firebaseEnabled is a stable value after initial app load for the purpose of this hook
             setCurrentUser({ uid: 'mock-user-id', isAnonymous: true });
             setUserName('مستخدم مجهول');
             setUserRole('guest');
@@ -237,14 +218,17 @@ function App() {
         });
 
         return () => unsubscribeAuth();
-    }, []); // لن يتغير firebaseEnabled بعد التهيئة الأولية، لذا فهو ليس تابعاً فعلياً يعيد إنشاء الدالة
+    }, []); // firebaseEnabled removed from dependency array as per ESLint recommendation
+
+    // Effect to run authentication setup
     useEffect(() => {
         setupFirebaseAuth();
-    }, [setupFirebaseAuth]); // Run when setupFirebaseAuth changes
+    }, [setupFirebaseAuth]);
 
-    // Firestore Listeners
+    // Firestore Listeners for votes and comments
     useEffect(() => {
         if (!currentUser || !firebaseEnabled) {
+            // Reset votes and comments if Firebase is not enabled or user is not authenticated
             setVotes({ 'يامن': 0, 'غوث': 0, 'غياث': 0 });
             setComments([]);
             return;
@@ -262,7 +246,6 @@ function App() {
             setVotes(currentVotes);
         }, (error) => {
             console.error("Error fetching votes:", error);
-            // Enhanced error message for "unavailable" code
             let errorMessage = "تعذر جلب الأصوات من Firebase. قد تكون هناك مشكلة في الإعدادات.";
             if (error.code === 'unavailable') {
                 errorMessage = "تعذر الاتصال بخدمة Firebase (Firestore). يرجى التحقق من اتصال الإنترنت لديكم أو إعدادات Firebase الخاصة بالمشروع (مثل جدار الحماية أو قواعد الأمان في Firebase Console).";
@@ -278,7 +261,6 @@ function App() {
             setComments(fetchedComments);
         }, (error) => {
             console.error("Error fetching comments:", error);
-            // Enhanced error message for "unavailable" code
             let errorMessage = "تعذر جلب التعليقات من Firebase. قد تكون هناك مشكلة في الإعدادات.";
             if (error.code === 'unavailable') {
                 errorMessage = "تعذر الاتصال بخدمة Firebase (Firestore). يرجى التحقق من اتصال الإنترنت لديكم أو إعدادات Firebase الخاصة بالمشروع (مثل جدار الحماية أو قواعد الأمان في Firebase Console).";
@@ -291,8 +273,9 @@ function App() {
             unsubscribeComments();
         };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [currentUser, firebaseEnabled]);
+    }, [currentUser, firebaseEnabled]); // Keep these dependencies as they genuinely affect the Firestore listeners
 
+    // Function to show temporary messages to the user (e.g., success/error notifications)
     const showTemporaryMessage = (message, type = 'info') => {
         setTempMessage(message);
         setTempMessageType(type);
@@ -300,9 +283,10 @@ function App() {
         if (messageBox) {
             messageBox.className = `fixed top-4 right-4 text-white p-3 rounded-lg shadow-lg z-50 animate-fadeInOut ${type === 'error' ? 'bg-red-600' : (type === 'success' ? 'bg-green-600' : 'bg-blue-600')}`;
         }
-        setTimeout(() => setTempMessage(''), 3000);
+        setTimeout(() => setTempMessage(''), 3000); // Message disappears after 3 seconds
     };
 
+    // Handler for name voting
     const handleVote = async (name) => {
         if (!firebaseEnabled) {
             showTemporaryMessage("وظائف Firebase غير نشطة. لا يمكن حفظ التصويت.", 'error');
@@ -320,6 +304,7 @@ function App() {
         const currentUserId = currentUser.uid;
 
         try {
+            // Check if the user has already voted for this name to prevent multiple votes
             const userVoteControlDocRef = doc(firestoreDbInstance, `artifacts/${appId}/users/${currentUserId}/myVoteControl`, name);
             const userVoteControlSnap = await getDoc(userVoteControlDocRef);
 
@@ -328,6 +313,7 @@ function App() {
                 return;
             }
 
+            // Record the public vote
             const publicVoteDocRef = doc(firestoreDbInstance, `artifacts/${appId}/public/data/nameVotes`, `${name}_${currentUserId}_${Date.now()}`);
             await setDoc(publicVoteDocRef, {
                 name: name,
@@ -336,6 +322,7 @@ function App() {
                 timestamp: new Date()
             });
 
+            // Record that this user has voted for this name in their private control document
             await setDoc(userVoteControlDocRef, { voted: true, timestamp: new Date() });
 
             showTemporaryMessage(`تم التصويت لاسم ${name} بنجاح!`, 'success');
@@ -345,6 +332,7 @@ function App() {
         }
     };
 
+    // Handler for adding comments
     const handleAddComment = async () => {
         if (!firebaseEnabled) {
             showTemporaryMessage("وظائف Firebase غير نشطة. لا يمكن حفظ التعليقات.", 'error');
@@ -382,6 +370,7 @@ function App() {
         }
     };
 
+    // Handler for changing user role (Father, Mother, Guest)
     const handleUserRoleChange = (role, customName = '') => {
         setUserRole(role);
         let newUserName;
@@ -395,12 +384,14 @@ function App() {
             newUserName = 'مستخدم مجهول';
         }
         setUserName(newUserName);
+        // Persist user role and name in local storage
         localStorage.setItem('userRole', role);
         localStorage.setItem('userName', newUserName);
         showTemporaryMessage(`تم تحديد هويتك كـ ${newUserName}.`, 'info');
     };
 
-    // Modified to return static content
+    // Function to retrieve static content (blessings, fun facts, similar names)
+    // Used when AI generation is disabled or not applicable.
     const getStaticContent = (type, name, meaning = '') => {
         if (type === 'blessing') {
             return staticBlessings[name] || "لا توجد بركة محددة لهذا الاسم حالياً.";
@@ -412,6 +403,7 @@ function App() {
         return "المحتوى غير متوفر.";
     };
 
+    // Handlers for generating static content
     const handleGenerateBlessing = async (name, meaning) => {
         setLoadingBlessing(true);
         setGeneratedBlessing('');
@@ -434,6 +426,7 @@ function App() {
         setFunFact(text);
     };
 
+    // Handler for submitting name vibe choices
     const handleNameVibeSubmission = (name, vibe) => {
         setVibeChosenCounts(prevCounts => {
             const newCounts = { ...prevCounts };
@@ -445,7 +438,7 @@ function App() {
         showTemporaryMessage(`تم اختيار "${vibe}" لاسم ${name}!`, 'success');
     };
 
-    // Tone.js sound playing function
+    // Tone.js sound playing function for name melodies
     const playNameSound = (name) => {
         if (typeof window.Tone === 'undefined') {
             showTemporaryMessage("مكتبة الصوت غير متاحة. يرجى التأكد من تحميل Tone.js CDN.", 'error');
@@ -477,7 +470,7 @@ function App() {
     };
 
 
-    // Name Details (unchanged as per previous instructions, 'الغوث' is intentionally included as a name for analysis, but not in nameKeys for selection)
+    // Detailed name information and analysis data
     const nameDetails = {
         'يامن': {
             meaning: 'المبارك، الميمون، ذو اليمين، كثير اليمن والبركة.',
@@ -538,6 +531,7 @@ function App() {
         },
     };
 
+    // Axes for detailed analysis in the Analysis tab
     const axes = [
         "المعنى اللغوي", "التأثير النفسي", "الأهمية الثقافية", "الدلالة الدينية", "الشهرة والاستخدام",
         "العملية وسهولة النطق", "التوقعات المستقبلية", "القوة الشخصية المتوقعة", "التوافق مع اللقب",
@@ -545,24 +539,25 @@ function App() {
         "التحليل الصوتي (تقريبي)", "بدائل تفسيرية"
     ];
 
+    // React component for displaying a single name analysis card
     const AnalysisCard = ({ name, details, isExpanded, onExpand }) => (
         <div
             className={`bg-white rounded-xl shadow-xl p-6 transform transition-all duration-500 ease-in-out
             ${isExpanded ? 'col-span-full ring-4 ring-indigo-500 z-20 md:p-8 lg:p-10' : 'hover:scale-105 hover:shadow-2xl relative cursor-pointer flex flex-col justify-between items-center text-center p-4'}
             `}
-            onClick={() => onExpand(isExpanded ? null : name)}
+            onClick={() => onExpand(isExpanded ? null : name)} // Toggle expansion on click
         >
             <h3 className={`font-extrabold text-indigo-800 mb-4 ${isExpanded ? 'text-4xl sm:text-5xl border-b-4 border-indigo-400 pb-3 font-cairo-display' : 'text-2xl sm:text-3xl font-cairo-display'}`}>
                 {name}
             </h3>
-            {!isExpanded ? (
+            {!isExpanded ? ( // Collapsed view
                 <>
                     <p className="text-gray-600 text-sm sm:text-base mb-4 flex-grow">{details.meaning}</p>
                     <button className="bg-blue-500 text-white px-4 py-2 rounded-full text-sm sm:text-base hover:bg-blue-600 transition-colors shadow-md">
                         اعرف المزيد
                     </button>
                 </>
-            ) : (
+            ) : ( // Expanded view
                 <>
                     <div className="space-y-4 mb-8">
                         {axes.map((axis, index) => (
@@ -629,7 +624,7 @@ function App() {
         </div>
     );
 
-
+    // Helper function to map axis names to their corresponding keys in nameDetails
     const getAxisKey = (axis) => {
         switch (axis) {
             case "المعنى اللغوي": return "linguistic";
@@ -651,7 +646,7 @@ function App() {
         }
     };
 
-    // Use nameKeys for comparison data to ensure 'الغوث' is included for analysis, even if not selected for new births
+    // Prepare data for name comparison, sorting by score
     const comparisonData = nameKeys.map(name => ({
         name,
         score: nameDetails[name].score,
@@ -673,10 +668,12 @@ function App() {
 
     const sortedComparisonData = [...comparisonData].sort((a, b) => b.score - a.score);
 
+    // React component for displaying final recommendations
     const Recommendation = () => {
         const suitableNames = sortedComparisonData;
 
         let primaryRecommendationNames = [];
+        // Prioritize 'يامن' and 'غياث' if they exist in the suitable names
         if (suitableNames.some(n => n.name === 'يامن')) {
             primaryRecommendationNames.push(suitableNames.find(n => n.name === 'يامن'));
         }
@@ -684,6 +681,7 @@ function App() {
             primaryRecommendationNames.push(suitableNames.find(n => n.name === 'غياث'));
         }
 
+        // Sort the primary recommendations by score
         primaryRecommendationNames.sort((a,b) => b.score - a.score);
 
         let finalRecommended = [];
@@ -772,7 +770,7 @@ function App() {
         );
     };
 
-    // Quiz Questions and Logic
+    // Quiz Questions and Logic for the "Ideal Name Quiz" game
     const quizQuestions = [
         {
             question: "ما هي الصفة الأهم التي تتمنونها في شخصية طفلكما المستقبلية؟",
@@ -808,6 +806,7 @@ function App() {
         },
     ];
 
+    // Function to start the quiz
     const startQuiz = () => {
         setQuizStarted(true);
         setCurrentQuizQuestionIndex(0);
@@ -819,6 +818,7 @@ function App() {
         setQuizResult(null);
     };
 
+    // Handler for quiz answer submission
     const handleQuizAnswer = (scores) => {
         setQuizScores(prevScores => {
             const newScores = { ...prevScores };
@@ -831,10 +831,9 @@ function App() {
         if (currentQuizQuestionIndex < quizQuestions.length - 1) {
             setCurrentQuizQuestionIndex(prevIndex => prevIndex + 1);
         } else {
-            // Quiz finished, determine result
+            // Quiz finished, determine the recommended name(s) based on highest score
             let maxScore = -1;
             let recommendedNames = [];
-            // Ensure quizScores is not undefined or null before iterating
             const currentQuizScores = quizScores; // Use the current state value directly
             for (const name in currentQuizScores) {
                 if (currentQuizScores[name] > maxScore) {
@@ -848,6 +847,7 @@ function App() {
         }
     };
 
+    // Function to reset the quiz game
     const resetQuiz = () => {
         setQuizStarted(false);
         setCurrentQuizQuestionIndex(0);
@@ -872,35 +872,36 @@ function App() {
             let nextName;
             do {
                 nextName = vibeGameNames[Math.floor(Math.random() * vibeGameNames.length)];
-            } while (vibeGameMatches[nextName]); // Ensure unique name
+            } while (vibeGameMatches[nextName]); // Ensure unique name is selected
 
             setVibeGameCurrentName(nextName);
 
-            // Shuffle vibes including correct ones
+            // Shuffle vibes including correct ones and some random ones for options
             const correctVibes = vibeDefinitions[nextName];
             let allPossibleVibes = new Set();
             vibeGameNames.forEach(n => vibeDefinitions[n].forEach(v => allPossibleVibes.add(v)));
             allPossibleVibes = Array.from(allPossibleVibes);
 
             const shuffledOptions = [...correctVibes];
-            // FIX: Corrected typo from allPossibleVebes to allPossibleVibes
-            while (shuffledOptions.length < 4 && shuffledOptions.length < allPossibleVibes.length) { 
+            // FIX 4: Corrected typo from allPossibleVebes to allPossibleVibes in this line.
+            while (shuffledOptions.length < 4 && shuffledOptions.length < allPossibleVibes.length) {
                 const randomVibe = allPossibleVibes[Math.floor(Math.random() * allPossibleVibes.length)];
                 if (!shuffledOptions.includes(randomVibe)) {
                     shuffledOptions.push(randomVibe);
                 }
             }
-            // Shuffle the options to make order random
+            // Shuffle the options array to randomize display order
             shuffledOptions.sort(() => Math.random() - 0.5);
             setVibeGameOptions(shuffledOptions);
 
         } else {
-            setVibeGameCurrentName(null); // Game over
+            setVibeGameCurrentName(null); // Game over when all names have been matched
         }
     };
 
+    // Handler for submitting a vibe match
     const handleVibeMatch = (selectedVibe) => {
-        if (!vibeGameCurrentName) return;
+        if (!vibeGameCurrentName) return; // Prevent action if no current name
 
         const correctVibes = vibeDefinitions[vibeGameCurrentName];
         const isCorrect = correctVibes.includes(selectedVibe);
@@ -918,10 +919,11 @@ function App() {
         }
 
         setTimeout(() => {
-            loadNextVibeGameName();
-        }, 1000); // Give time for message to display
+            loadNextVibeGameName(); // Load next name after a short delay
+        }, 1000);
     };
 
+    // Function to reset the vibe matching game
     const resetVibeGame = () => {
         setVibeGameStarted(false);
         setVibeGameScore(0);
@@ -930,13 +932,13 @@ function App() {
         setVibeGameOptions([]);
     };
 
-
+    // Function to determine background classes based on active tab for visual variety
     const getBackgroundClasses = (tab) => {
         switch (tab) {
             case 'analysis': return 'bg-gradient-to-br from-blue-50 to-indigo-100';
             case 'comparison': return 'bg-gradient-to-br from-purple-50 to-pink-100';
             case 'voting': return 'bg-gradient-to-br from-green-50 to-teal-100';
-            case 'games': return 'bg-gradient-to-br from-red-50 to-orange-100'; // New background for games
+            case 'games': return 'bg-gradient-to-br from-red-50 to-orange-100';
             case 'message': return 'bg-gradient-to-br from-yellow-50 to-orange-100';
             case 'recommendation': return 'bg-gradient-to-br from-red-50 to-purple-100';
             default: return 'bg-gradient-to-br from-blue-50 to-indigo-100';
@@ -945,7 +947,8 @@ function App() {
 
     return (
         <div className={`font-inter min-h-screen p-4 sm:p-8 flex flex-col items-center transition-colors duration-500 ${getBackgroundClasses(activeTab)}`}>
-            {/* Inline style for Cairo font to ensure it compiles correctly with Tailwind */}
+            {/* Inline style for Cairo font to ensure it compiles correctly with Tailwind.
+                This is important for custom font usage in environments without direct CSS file control. */}
             <style>
               {`
                 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap');
@@ -955,6 +958,7 @@ function App() {
               `}
             </style>
 
+            {/* Temporary message box for notifications (success, error, info) */}
             {tempMessage && (
                 <div id="temp-message-box" className={`fixed top-4 right-4 text-white p-3 rounded-lg shadow-lg z-50 animate-fadeInOut 
                     ${tempMessageType === 'error' ? 'bg-red-600' : (tempMessageType === 'success' ? 'bg-green-600' : 'bg-blue-600')}`}
@@ -962,21 +966,25 @@ function App() {
                     {tempMessage}
                 </div>
             )}
+            {/* Warning if Firebase is not enabled (e.g., incomplete configuration) */}
             {!firebaseEnabled && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4 w-full max-w-xl text-center shadow-md animate-fadeIn">
                     <strong className="font-bold">تنبيه: </strong>
                     <span className="block sm:inline">وظائف حفظ البيانات (التصويت، التعليقات) **معطلة حالياً**. يرجى إعداد مشروع Firebase الخاص بكم لتفعيلها لاحقاً.</span>
                 </div>
             )}
+            {/* Note for non-Canvas environments where AI generation might be replaced by static content */}
             {!IS_CANVAS_ENVIRONMENT && (
                 <div className="bg-orange-100 border border-orange-400 text-orange-700 px-4 py-3 rounded-lg relative mb-4 w-full max-w-xl text-center shadow-md animate-fadeIn">
                     <strong className="font-bold">ملاحظة: </strong>
                     <span className="block sm:inline">ميزات الذكاء الاصطناعي (توليد البركات والمعلومات) **معطلة حالياً** في هذا الإصدار المنشور لضمان استقرار التطبيق. تم استبدالها بمحتوى ثابت.</span>
                 </div>
             )}
+            {/* Main application container with shared styling */}
             <div className="w-full max-w-6xl bg-white rounded-xl shadow-2xl overflow-hidden mb-8 transform transition-all duration-300">
+                {/* Header section with title, description, and countdown */}
                 <header className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-6 rounded-t-xl text-center relative overflow-hidden">
-                    <div className="absolute inset-0 opacity-10 bg-pattern"></div>
+                    <div className="absolute inset-0 opacity-10 bg-pattern"></div> {/* Decorative background */}
                     <h1 className="text-4xl sm:text-5xl font-extrabold mb-2 leading-tight drop-shadow-lg font-cairo-display">
                         ✨ نجم العائلة: بوابة اختيار اسم مولودكما ✨
                     </h1>
@@ -995,6 +1003,7 @@ function App() {
                     )}
                 </header>
 
+                {/* Navigation tabs */}
                 <nav className="bg-gradient-to-r from-blue-500 to-indigo-600 p-3 shadow-md">
                     <ul className="flex justify-around text-white font-semibold text-base sm:text-lg">
                         <li className={`cursor-pointer px-4 py-2 rounded-full transition-all duration-300 ${activeTab === 'analysis' ? 'bg-white text-indigo-600 shadow-lg' : 'hover:bg-indigo-500'}`} onClick={() => { setActiveTab('analysis'); setExpandedName(null); }}>
@@ -1018,6 +1027,7 @@ function App() {
                     </ul>
                 </nav>
 
+                {/* Main content area based on active tab */}
                 <main className="p-6 sm:p-8">
                     {activeTab === 'analysis' && (
                         <section className="animate-fadeIn">
@@ -1565,11 +1575,12 @@ function App() {
                         </section>
                     )}
                 </main>
+                {/* Footer section with app credits and share button */}
                 <footer className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-4 text-center rounded-b-xl shadow-inner mt-8">
                     <p className="text-sm opacity-90 mb-2">صُنع بحب لعائلة الغزالي 💖</p>
                     <button
                         onClick={() => {
-                            // Using document.execCommand('copy') for better iframe compatibility
+                            // Using document.execCommand('copy') for better iframe compatibility and broader browser support.
                             const el = document.createElement('textarea');
                             el.value = window.location.href;
                             document.body.appendChild(el);
