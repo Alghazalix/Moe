@@ -132,7 +132,7 @@ function App() {
     // Quiz Game States
     const [quizStarted, setQuizStarted] = useState(false);
     const [currentQuizQuestionIndex, setCurrentQuizQuestionIndex] = useState(0);
-    const [quizScores, setQuizScores] = useState({});
+    const [quizScores, setQuizScores] = useState({}); // FIX: Initialized with useState({})
     const [quizResult, setQuizResult] = useState(null);
 
     // Name Vibe Matching Game States
@@ -178,8 +178,8 @@ function App() {
         const timer = setInterval(calculateCountdown, 1000);
 
         return () => clearInterval(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Empty dependency array means this runs once on mount, updates state, and cleanup runs on unmount.
+    }, [targetDate]); // FIX: Added targetDate to dependency array
+
 
     // Firebase Authentication & Listeners - Using useCallback to memoize and prevent infinite loops
     const setupFirebaseAuth = useCallback(async () => {
