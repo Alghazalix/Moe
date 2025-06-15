@@ -211,12 +211,7 @@ function App() {
                             .then(userCredential => console.log("Signed in with custom token:", userCredential.user.uid))
                             .catch(error => {
                                 console.error("Error signing in with custom token, falling back to anonymous:", error);
-                                signInAnonymously(firebaseAuthInstance)
-                                    .then(anonUserCredential => console.log("Signed in anonymously after custom token failure:", anonUserCredential.user.uid))
-                                    .catch(anonError => {
-                                        console.error("Final anonymous sign-in failed:", anonError);
-                                        showTemporaryMessage("فشل تسجيل الدخول التلقائي. قد لا تعمل بعض الميزات.", 'error');
-                                    });
+                                showTemporaryMessage("فشل تسجيل الدخول التلقائي. قد لا تعمل بعض الميزات.", 'error');
                             });
                     } else {
                         signInAnonymously(firebaseAuthInstance)
@@ -260,7 +255,12 @@ function App() {
             setVotes(currentVotes);
         }, (error) => {
             console.error("Error fetching votes:", error);
-            showTemporaryMessage("تعذر جلب الأصوات من Firebase. قد تكون هناك مشكلة في الإعدادات.", 'error');
+            // Enhanced error message for "unavailable" code
+            let errorMessage = "تعذر جلب الأصوات من Firebase. قد تكون هناك مشكلة في الإعدادات.";
+            if (error.code === 'unavailable') {
+                errorMessage = "تعذر الاتصال بخدمة Firebase (Firestore). يرجى التحقق من اتصال الإنترنت لديكم أو إعدادات Firebase الخاصة بالمشروع (مثل جدار الحماية أو قواعد الأمان في Firebase Console).";
+            }
+            showTemporaryMessage(errorMessage, 'error');
         });
 
         const commentsCollectionRef = collection(firestoreDbInstance, `artifacts/${appId}/public/data/nameComments`);
@@ -271,7 +271,12 @@ function App() {
             setComments(fetchedComments);
         }, (error) => {
             console.error("Error fetching comments:", error);
-            showTemporaryMessage("تعذر جلب التعليقات من Firebase. قد تكون هناك مشكلة في الإعدادات.", 'error');
+            // Enhanced error message for "unavailable" code
+            let errorMessage = "تعذر جلب التعليقات من Firebase. قد تكون هناك مشكلة في الإعدادات.";
+            if (error.code === 'unavailable') {
+                errorMessage = "تعذر الاتصال بخدمة Firebase (Firestore). يرجى التحقق من اتصال الإنترنت لديكم أو إعدادات Firebase الخاصة بالمشروع (مثل جدار الحماية أو قواعد الأمان في Firebase Console).";
+            }
+            showTemporaryMessage(errorMessage, 'error');
         });
 
         return () => {
