@@ -5,16 +5,16 @@ import { initializeApp } from 'firebase/app';
 
 // استيراد المكونات الفرعية: تأكد من أن هذه المسارات وأسماء الملفات مطابقة تماماً
 // لأسمائها الفعلية في مجلد src لديك، مع مراعاة حساسية الأحرف الكبيرة والصغيرة.
-// مثال: يجب أن يكون مجلد 'components' باسم 'components' وليس 'Components'
-import AnalysisTab from './components/AnalysisTab.js';
-import ComparisonTab from './components/ComparisonTab.js';
-import VotingTab from './components/VotingTab.js';
-import GamesTab from './components/GamesTab.js';
-import MessageTab from './components/MessageTab.js';
-import RecommendationTab from './components/RecommendationTab.js';
-import FutureVisionTab from './components/FutureVisionTab.js';
-import GemsTab from './components/GemsTab.js';
-import { staticData } from './data/staticData.js'; // استيراد البيانات الثابتة من ملف منفصل
+// تم إزالة امتداد .js من المسارات المحلية، حيث يقوم نظام البناء عادةً بمعالجتها تلقائياً.
+import AnalysisTab from './components/AnalysisTab';
+import ComparisonTab from './components/ComparisonTab';
+import VotingTab from './components/VotingTab';
+import GamesTab from './components/GamesTab';
+import MessageTab from './components/MessageTab';
+import RecommendationTab from './components/RecommendationTab';
+import FutureVisionTab from './components/FutureVisionTab';
+import GemsTab from './components/GemsTab';
+import { staticData } from './data/staticData'; // استيراد البيانات الثابتة من ملف منفصل
 
 // تعريف ما إذا كان التطبيق يعمل في بيئة Canvas (للتطوير المحلي مقابل نشر Netlify)
 const IS_CANVAS_ENVIRONMENT = typeof window.__app_id !== 'undefined';
@@ -91,6 +91,7 @@ if (!firebaseEnabled) {
 }
 
 // القائمة الرئيسية للأسماء المستخدمة في التطبيق لأقسام مختلفة
+// ملاحظة: nameKeys ثابت خارج المكون، لذا لا يحتاج ليكون تابعاً في useCallback
 const nameKeys = ['يامن', 'غوث', 'غياث'];
 
 // تفاصيل الأسماء
@@ -264,7 +265,6 @@ export default function App() {
     const personalityImpactQuestions = staticData.personalityImpactQuestions;
 
     // دالة لعرض الرسائل المؤقتة للمستخدم (مثل إشعارات النجاح/الخطأ)
-    // IMPORTANT: This must be defined BEFORE any other useCallback/useEffect that uses it.
     const showTemporaryMessage = useCallback((message, type = 'info', duration = 3000) => {
         setTempMessage(message);
         setTempMessageType(type);
@@ -273,7 +273,7 @@ export default function App() {
             messageBox.className = `fixed top-4 right-4 text-white p-3 rounded-lg shadow-lg z-50 animate-fadeInOut 
                     ${type === 'error' ? 'bg-red-600' : (type === 'success' ? 'bg-green-600' : 'bg-blue-600')}`;
         }
-        setTimeout(() => setTempMessage(''), duration); // تختفي الرسالة بعد 'duration' مللي ثانية
+        setTimeout(() => setTempMessage(''), duration);
     }, []);
 
 
@@ -340,22 +340,24 @@ export default function App() {
         setCurrentQuizQuestionIndex(0);
         setQuizScores(() => {
             const initialScores = {};
+            // nameKeys is a constant and does not need to be in dependency array
             nameKeys.forEach(name => { initialScores[name] = 0; });
             return initialScores;
         });
         setQuizResult(null);
-    }, [nameKeys]);
+    }, []); // Removed nameKeys from dependencies
 
     const resetQuiz = useCallback(() => {
         setQuizStarted(false);
         setCurrentQuizQuestionIndex(0);
         setQuizScores(() => {
             const initialScores = {};
+            // nameKeys is a constant and does not need to be in dependency array
             nameKeys.forEach(name => { initialScores[name] = 0; });
             return initialScores;
         });
         setQuizResult(null);
-    }, [nameKeys]);
+    }, []); // Removed nameKeys from dependencies
 
     const startTraitGame = useCallback(() => {
         setTraitGameStarted(true);
@@ -382,8 +384,7 @@ export default function App() {
                 showTemporaryMessage(`انتهت لعبة "من صاحب هذا الاسم؟" نتيجتك: ${traitGameScore + (selectedOption === currentQ.correctName ? 1 : 0)} من ${traitQuestions.length}`, 'info', 5000);
             }
         }, 1500);
-    }, [currentTraitIndex, traitQuestions, traitGameScore, showTemporaryMessage]);
-
+    }, [currentTraitIndex, traitQuestions, showTemporaryMessage]); // Removed traitGameScore
 
     const resetTraitGame = useCallback(() => {
         setTraitGameStarted(false);
@@ -415,7 +416,7 @@ export default function App() {
                 setStoryGameStarted(false);
             }
         }, 1500);
-    }, [currentStoryIndex, storyQuestions, storyGameScore]);
+    }, [currentStoryIndex, storyQuestions]); // Removed storyGameScore
 
     const resetStoryGame = useCallback(() => {
         setStoryGameStarted(false);
@@ -468,7 +469,7 @@ export default function App() {
     }, [flippedCards, memoryCards, matchedCards, moves]);
 
     const startMemoryGame = useCallback(() => {
-        const cards = [...memoryGamePairs, ...memoryGamePairs].map((item, index) => ({ // Use memoryGamePairs directly
+        const cards = [...staticData.memoryGamePairs, ...staticData.memoryGamePairs].map((item, index) => ({ // Use staticData directly
             ...item,
             uniqueId: `${item.id}-${item.vibe}-${index}`,
             isFlipped: false,
@@ -481,11 +482,11 @@ export default function App() {
         setMoves(0);
         setMemoryGameMessage('');
         setMemoryGameStarted(true);
-    }, [memoryGamePairs]); // Correct dependency
+    }, []); // Removed memoryGamePairs from dependencies as it's a static import
 
     const resetMemoryGame = useCallback(() => {
         setMemoryGameStarted(false);
-        const cards = [...memoryGamePairs, ...memoryGamePairs].map((item, index) => ({ // Use memoryGamePairs directly
+        const cards = [...staticData.memoryGamePairs, ...staticData.memoryGamePairs].map((item, index) => ({ // Use staticData directly
             ...item,
             uniqueId: `${item.id}-${item.vibe}-${index}`,
             isFlipped: false,
@@ -497,14 +498,14 @@ export default function App() {
         setMatchedCards([]);
         setMoves(0);
         setMemoryGameMessage('');
-    }, [memoryGamePairs]); // Correct dependency
+    }, []); // Removed memoryGamePairs from dependencies as it's a static import
 
     // دالة معالج لحجر النرد الاسمي
     const handleDiceRoll = useCallback(() => {
         const randomIndex = Math.floor(Math.random() * nameKeys.length);
         const randomName = nameKeys[randomIndex];
         showTemporaryMessage(`حجر النرد اختار: "${randomName}"! أتمنى له مستقبلاً باهراً!`, 'success', 4000);
-    }, [nameKeys, showTemporaryMessage]); // showTemporaryMessage is a dependency now
+    }, [showTemporaryMessage]); // Removed nameKeys from dependencies
 
     const handlePersonalityAnswer = useCallback((scores) => {
         setPersonalityQuizScores(prevScores => {
@@ -903,7 +904,7 @@ export default function App() {
         });
 
         return () => unsubscribeAuth();
-    }, [showTemporaryMessage]); // Dependency for showTemporaryMessage
+    }, [showTemporaryMessage]);
 
     useEffect(() => {
         setupFirebaseAuth();
@@ -957,7 +958,7 @@ export default function App() {
             unsubscribeVotes();
             unsubscribeComments();
         };
-    }, [currentUser, showTemporaryMessage]); // firebaseEnabled and appId are correctly removed as dependencies here since they are effectively constants after initial setup
+    }, [currentUser, showTemporaryMessage]);
 
     // معالج للتصويت على الاسم
     const handleVote = useCallback(async (name) => {
@@ -1001,7 +1002,7 @@ export default function App() {
             console.error("Error casting vote:", error);
             showTemporaryMessage("حدث خطأ أثناء التصويت. الرجاء المحاولة مرة أخرى.", 'error', 5000);
         }
-    }, [currentUser, userRole, showTemporaryMessage]); // firebaseEnabled and appId are correctly removed as dependencies here since they are effectively constants after initial setup
+    }, [currentUser, userRole, showTemporaryMessage]);
 
 
     // معالج لإضافة التعليقات
@@ -1041,7 +1042,7 @@ export default function App() {
             console.error("Error adding comment:", error);
             showTemporaryMessage("حدث خطأ أثناء إضافة التعليق. الرجاء المحاولة مرة أخرى.", 'error', 5000);
         }
-    }, [newComment, currentUser, userRole, userName, showTemporaryMessage]); // firebaseEnabled and appId are correctly removed as dependencies here since they are effectively constants after initial setup
+    }, [newComment, currentUser, userRole, userName, showTemporaryMessage]);
 
     // معالج لتغيير دور المستخدم (أب، أم، زائر)
     const handleUserRoleChange = useCallback((role, customName = '') => {
