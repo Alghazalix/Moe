@@ -1303,7 +1303,7 @@ export default function App() {
                             resetMemoryGame={resetMemoryGame}
 
                             // Dice Roll
-                            handleDiceRoll={handleDiceRoll} {/* Passing the function down */}
+                            handleDiceRoll={handleDiceRoll} {/* هذا هو السطر 1295 الذي يشير إليه الخطأ */}
 
                             // Personality Quiz (new)
                             personalityQuizStarted={personalityQuizStarted}
