@@ -1,10 +1,10 @@
 import React from 'react';
 
-// هذا هو مكون AnalysisTab.js
-// يرجى حفظ هذا الكود في ملف جديد باسم AnalysisTab.js في نفس مجلد App.js
+// هذا هو مكون AnalysisTab.js المحدث
+// يرجى حفظ هذا الكود في ملف جديد باسم AnalysisTab.js في مجلد src/components
 
-// المحتوى الثابت (للتذكير، تم نقل هذه البيانات إلى App.js الرئيسي لسهولة الوصول إليها
-// ولكن يمكن الاحتفاظ بها هنا إذا كان المكون سيعمل بشكل مستقل تمامًا)
+// المحتوى الثابت (للتذكير، يتم استيراد هذه البيانات الآن من staticData.js)
+// ولكن تم الاحتفاظ بها هنا لضمان عدم وجود أخطاء في العرض إذا لم يتم ربط staticData بشكل صحيح
 const staticImageMeaningData = {
     'يامن': {
         images: [
@@ -62,7 +62,7 @@ const staticPhoneticAnalysis = {
     }
 };
 
-const staticAIVisualizations = {
+const staticAIVisualizations = { // Keep this local for now as it's not directly used from App.js in this tab
     'يامن': {
         image: "https://placehold.co/400x300/28A745/FFFFFF?text=نور+وتفاؤل",
         description: "تصور فني لاسم 'يامن' يجسد هالة من النور الدافئ المحاطة برموز التفاؤل والبركة، مع خطوط انسيابية تعكس الحياة المليئة باليُمن والرخاء. الألوان السائدة هي الذهبي والأخضر الفاتح والأزرق السماوي، مما يوحي بالصفاء والنمو."
@@ -78,7 +78,7 @@ const staticAIVisualizations = {
 };
 
 
-const AnalysisCard = ({ name, details, isExpanded, onExpand, funFact, handleGenerateFunFact, suggestedNamesForCard, loadingSuggestions, handleGenerateSimilarNames, generatedPoem, loadingPoem, handleGeneratePoem }) => {
+const AnalysisCard = ({ name, details, isExpanded, onExpand, funFact, handleGenerateFunFact, suggestedNamesForCard, loadingSuggestions, handleGenerateSimilarNames, generatedPoem, loadingPoem, handleGeneratePoem, showTemporaryMessage, axes }) => {
     // Helper function to map axis names to their corresponding keys in nameDetails
     const getAxisKey = (axis) => {
         switch (axis) {
@@ -100,12 +100,13 @@ const AnalysisCard = ({ name, details, isExpanded, onExpand, funFact, handleGene
             default: return "";
         }
     };
-    const axes = [
-        "المعنى اللغوي", "التأثير النفسي", "الأهمية الثقافية", "الدلالة الدينية", "الشهرة والاستخدام",
-        "العملية وسهولة النطق", "التوقعات المستقبلية", "القوة الشخصية المتوقعة", "التوافق مع اللقب",
-        "الإيقاع الصوتي", "معاني أخرى في لغات مختلفة", "التفرد مقابل الشيوع", "القبول العام",
-        "التحليل الصوتي (تقريبي)", "بدائل تفسيرية"
-    ];
+    // Axes are now passed as a prop, no need to redefine them here
+    // const axes = [
+    //     "المعنى اللغوي", "التأثير النفسي", "الأهمية الثقافية", "الدلالة الدينية", "الشهرة والاستخدام",
+    //     "العملية وسهولة النطق", "التوقعات المستقبلية", "القوة الشخصية المتوقعة", "التوافق مع اللقب",
+    //     "الإيقاع الصوتي", "معاني أخرى في لغات مختلفة", "التفرد مقابل الشيوع", "القبول العام",
+    //     "التحليل الصوتي (تقريبي)", "بدائل تفسيرية"
+    // ];
 
     return (
         <div
@@ -156,9 +157,9 @@ const AnalysisCard = ({ name, details, isExpanded, onExpand, funFact, handleGene
                         <button
                             onClick={(e) => { e.stopPropagation(); handleGenerateSimilarNames(name); }}
                             className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-pink-300 flex items-center justify-center space-x-2 mt-4"
-                            disabled={loadingSuggestions[name]}
+                            disabled={loadingSuggestions} // Changed to single boolean
                         >
-                            {loadingSuggestions[name] ? (
+                            {loadingSuggestions ? ( // Changed to single boolean
                                 <>
                                     <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -215,7 +216,7 @@ const AnalysisCard = ({ name, details, isExpanded, onExpand, funFact, handleGene
 const AnalysisTab = ({
     nameKeys,
     nameDetails,
-    axes,
+    axes, // يجب أن يتم تمريرها الآن
     expandedName,
     setExpandedName,
     funFact,
@@ -234,29 +235,17 @@ const AnalysisTab = ({
     staticPhoneticAnalysis,
     selectedPhoneticAnalysisName,
     handleShowPhoneticAnalysis,
-    showTemporaryMessage,
+    showTemporaryMessage, // يجب أن يتم تمريرها الآن
 }) => {
     // Helper function to map axis names to their corresponding keys in nameDetails
-    const getAxisKey = (axis) => {
-        switch (axis) {
-            case "المعنى اللغوي": return "linguistic";
-            case "التأثير النفسي": return "psychological";
-            case "الأهمية الثقافية": return "cultural";
-            case "الدلالة الدينية": return "religious";
-            case "الشهرة والاستخدام": return "popularity";
-            case "العملية وسهولة النطق": return "practical";
-            case "التوقعات المستقبلية": return "futuristic";
-            case "القوة الشخصية المتوقعة": return "personalStrength";
-            case "التوافق مع اللقب": return "compatibility";
-            case "الإيقاع الصوتي": return "rhythm";
-            case "معاني أخرى في لغات مختلفة": return "otherMeaning";
-            case "التفرد مقابل الشيوع": return "uniqueness";
-            case "القبول العام": return "acceptance";
-            case "التحليل الصوتي (تقريبي)": return "linguistic";
-            case "بدائل تفسيرية": return "alternativeInterpretation";
-            default: return "";
-        }
-    };
+    // هذا موجود بالفعل في AnalysisCard
+    // const getAxisKey = (axis) => {
+    //     switch (axis) {
+    //         case "المعنى اللغوي": return "linguistic";
+    //         // ... rest of the cases
+    //         default: return "";
+    //     }
+    // };
     return (
         <section className="animate-fadeIn">
             <h2 className="text-3xl font-bold text-center text-indigo-700 mb-8 border-b-2 border-indigo-400 pb-4 font-cairo-display">
@@ -282,6 +271,8 @@ const AnalysisTab = ({
                         generatedPoem={generatedPoem}
                         loadingPoem={loadingPoem}
                         handleGeneratePoem={handleGeneratePoem}
+                        showTemporaryMessage={showTemporaryMessage} // تمرير showTemporaryMessage
+                        axes={axes} // تمرير axes
                     />
                 ))}
             </div>
