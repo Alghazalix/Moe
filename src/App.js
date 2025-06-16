@@ -381,10 +381,14 @@ export default function App() {
                 setCurrentTraitIndex(prev => prev + 1);
             } else {
                 setTraitGameStarted(false);
+                // The score needs to be the updated score for the final message.
+                // It's safer to pass a function to setTraitGameScore and read its output immediately
+                // or ensure the value is available from the `selectedOption` check.
+                // For this message, we'll re-evaluate the final score based on the current action.
                 showTemporaryMessage(`انتهت لعبة "من صاحب هذا الاسم؟" نتيجتك: ${traitGameScore + (selectedOption === currentQ.correctName ? 1 : 0)} من ${traitQuestions.length}`, 'info', 5000);
             }
         }, 1500);
-    }, [currentTraitIndex, traitQuestions, showTemporaryMessage]); // Removed traitGameScore
+    }, [currentTraitIndex, traitQuestions, traitGameScore, showTemporaryMessage]); // Added traitGameScore back as a dependency
 
     const resetTraitGame = useCallback(() => {
         setTraitGameStarted(false);
@@ -416,7 +420,7 @@ export default function App() {
                 setStoryGameStarted(false);
             }
         }, 1500);
-    }, [currentStoryIndex, storyQuestions]); // Removed storyGameScore
+    }, [currentStoryIndex, storyQuestions, storyGameScore]); // Added storyGameScore back as a dependency
 
     const resetStoryGame = useCallback(() => {
         setStoryGameStarted(false);
@@ -505,7 +509,7 @@ export default function App() {
         const randomIndex = Math.floor(Math.random() * nameKeys.length);
         const randomName = nameKeys[randomIndex];
         showTemporaryMessage(`حجر النرد اختار: "${randomName}"! أتمنى له مستقبلاً باهراً!`, 'success', 4000);
-    }, [showTemporaryMessage]); // Removed nameKeys from dependencies
+    }, [showTemporaryMessage]); // Removed nameKeys from dependencies as it's a static constant
 
     const handlePersonalityAnswer = useCallback((scores) => {
         setPersonalityQuizScores(prevScores => {
@@ -1285,7 +1289,7 @@ export default function App() {
                             resetTraitGame={resetTraitGame}
 
                             // Story Game
-                            storyGameStarted={storyGameStarted}
+                            storyGameStarted={storyGameStarted}e
                             currentStoryIndex={currentStoryIndex}
                             storyGameScore={storyGameScore}
                             storyGameFeedback={storyGameFeedback}
