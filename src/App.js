@@ -3,7 +3,9 @@ import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged }
 import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot } from 'firebase/firestore';
 import { initializeApp } from 'firebase/app';
 
-// استيراد المكونات الفرعية (تمت إضافة امتداد .js لضمان الحل)
+// استيراد المكونات الفرعية: تأكد من أن هذه المسارات وأسماء الملفات مطابقة تماماً
+// لأسمائها الفعلية في مجلد src لديك، مع مراعاة حساسية الأحرف الكبيرة والصغيرة.
+// مثال: يجب أن يكون مجلد 'components' باسم 'components' وليس 'Components'
 import AnalysisTab from './components/AnalysisTab.js';
 import ComparisonTab from './components/ComparisonTab.js';
 import VotingTab from './components/VotingTab.js';
@@ -12,7 +14,7 @@ import MessageTab from './components/MessageTab.js';
 import RecommendationTab from './components/RecommendationTab.js';
 import FutureVisionTab from './components/FutureVisionTab.js';
 import GemsTab from './components/GemsTab.js';
-import { staticData } from './data/staticData.js'; // استيراد البيانات الثابتة من ملف منفصل (تمت إضافة امتداد .js)
+import { staticData } from './data/staticData.js'; // استيراد البيانات الثابتة من ملف منفصل
 
 // تعريف ما إذا كان التطبيق يعمل في بيئة Canvas (للتطوير المحلي مقابل نشر Netlify)
 const IS_CANVAS_ENVIRONMENT = typeof window.__app_id !== 'undefined';
@@ -1303,7 +1305,7 @@ export default function App() {
                             resetMemoryGame={resetMemoryGame}
 
                             // Dice Roll
-                            handleDiceRoll={handleDiceRoll} {/* هذا هو السطر 1295 الذي يشير إليه الخطأ */}
+                            handleDiceRoll={handleDiceRoll} 
 
                             // Personality Quiz (new)
                             personalityQuizStarted={personalityQuizStarted}
