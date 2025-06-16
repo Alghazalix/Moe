@@ -3,7 +3,7 @@ import React, { useState, useCallback } from 'react';
 export default function VotingTab({
     nameKeys,
     nameDetails,
-    userRole,
+    userRole, // تم الاحتفاظ بها لتحديد 'الأب/الأم' في نافذة اختيار الاسم ولكن ليست شرطاً للتصويت
     userName,
     handleUserRoleChange,
     votes,
@@ -15,17 +15,17 @@ export default function VotingTab({
     currentUser,
     showTemporaryMessage,
     firebaseEnabled,
-    isAuthReady // This prop is passed from App.js
+    isAuthReady // هذه الخاصية يتم تمريرها من App.js
 }) {
     const [customNameInput, setCustomNameInput] = useState('');
     const [showRoleSelectionModal, setShowRoleSelectionModal] = useState(false);
 
-    // دالة لفتح نافذة اختيار الدور
+    // دالة لفتح نافذة اختيار الدور/الاسم
     const openRoleSelection = useCallback(() => {
         setShowRoleSelectionModal(true);
     }, []);
 
-    // دالة لإغلاق نافذة اختيار الدور
+    // دالة لإغلاق نافذة اختيار الدور/الاسم
     const closeRoleSelection = useCallback(() => {
         setShowRoleSelectionModal(false);
     }, []);
@@ -36,10 +36,9 @@ export default function VotingTab({
         closeRoleSelection();
     }, [handleUserRoleChange, customNameInput, closeRoleSelection]);
 
-    // السماح لأي مستخدم مصادق عليه (بما في ذلك المجهولين) بالتصويت والتعليق
-    // تم تبسيط هذا الشرط ليتوافق مع رغبتك في التصويت للجميع
+    // شرط تفعيل أزرار التصويت والتعليق:
+    // يجب أن تكون المصادقة جاهزة، وFirebase مفعل، ووجود مستخدم (ليس Mock User من بيئة التطوير)
     const canVoteAndComment = isAuthReady && firebaseEnabled && currentUser && currentUser.uid !== 'mock-user-id';
-
 
     return (
         <div className="text-right p-4 sm:p-6 bg-white rounded-lg shadow-lg flex flex-col space-y-6">
@@ -48,18 +47,18 @@ export default function VotingTab({
                 يا عائلة الغزالي الكريمة، صوتوا لاسم طفلكم المستقبلي المفضل. سيساعدنا رأيكم في اتخاذ القرار الأخير!
             </p>
 
-            {/* Current User Role/Name Display Section */}
+            {/* قسم عرض هوية المستخدم الحالية */}
             <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 flex items-center justify-between shadow-sm">
                 <span className="text-indigo-800 font-semibold text-lg">هويتك الحالية: <span className="font-bold">{userName}</span></span>
                 <button
                     onClick={openRoleSelection}
                     className="bg-indigo-600 text-white px-5 py-2 rounded-full font-semibold text-base hover:bg-indigo-700 transition duration-300 transform hover:scale-105 shadow-md"
                 >
-                    تغيير الاسم/الدور
+                    تغيير الاسم/الهوية
                 </button>
             </div>
 
-            {/* Explanatory messages about voting status */}
+            {/* رسائل توضيحية حول حالة التصويت */}
             {!isAuthReady && firebaseEnabled && (
                 <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded-lg relative text-center animate-fadeIn">
                     <strong className="font-bold">لحظة من فضلك: </strong>
@@ -72,13 +71,13 @@ export default function VotingTab({
                     <span className="block sm:inline">وظائف حفظ البيانات (التصويت، التعليقات) **معطلة**. يرجى إعداد مشروع Firebase الخاص بكم لتفعيلها.</span>
                 </div>
             )}
-            {firebaseEnabled && isAuthReady && currentUser && currentUser.isAnonymous && (
-                <div className="bg-orange-100 border border-orange-400 text-orange-700 px-4 py-3 rounded-lg relative text-center animate-fadeIn">
-                    <strong className="font-bold">معلومات: </strong>
-                    <span className="block sm:inline">أنت تستخدم وضع الزائر المجهول. لكي يتم حفظ تصويتك/تعليقك بشكل دائم، يرجى التأكد من أن إعدادات Firebase صحيحة لمشروعك، و**تحديد قواعد أمان Firestore بشكل صحيح.**</span>
+            {firebaseEnabled && isAuthReady && currentUser && currentUser.isAnonymous && userName === 'مجهول' && (
+                <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded-lg relative text-center animate-fadeIn">
+                    <strong className="font-bold">معلومة: </strong>
+                    <span className="block sm:inline">يمكنك التصويت وكتابة التعليقات الآن كـ "مجهول". إذا أردت استخدام اسم، اضغط "تغيير الاسم/الهوية".</span>
                 </div>
             )}
-            {firebaseEnabled && isAuthReady && !currentUser && ( // If isAuthReady but no current user (implies sign-in failed or user logged out)
+            {firebaseEnabled && isAuthReady && !currentUser && ( // إذا كانت المصادقة جاهزة ولكن لا يوجد مستخدم (فشل تسجيل الدخول التلقائي)
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative text-center animate-fadeIn">
                     <strong className="font-bold">خطأ: </strong>
                     <span className="block sm:inline">تعذر تسجيل الدخول التلقائي إلى Firebase. يرجى تحديث الصفحة أو التحقق من اتصال الإنترنت لديك.</span>
@@ -86,7 +85,7 @@ export default function VotingTab({
             )}
 
 
-            {/* Voting Section */}
+            {/* قسم التصويت */}
             <div className="bg-gradient-to-r from-teal-50 to-green-50 p-6 rounded-xl shadow-inner border border-teal-200">
                 <h3 className="text-2xl font-bold text-teal-800 mb-4 text-center font-cairo-display">صوتوا لاسمكم المفضل:</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -99,7 +98,7 @@ export default function VotingTab({
                             </div>
                             <button
                                 onClick={() => handleVote(name)}
-                                disabled={!canVoteAndComment} // Disable button based on canVoteAndComment
+                                disabled={!canVoteAndComment} // تعطيل الزر بناءً على canVoteAndComment
                                 className={`w-full px-5 py-2 rounded-full font-semibold text-base transition duration-300 transform hover:scale-105 shadow-md
                                     ${canVoteAndComment ? 'bg-green-600 text-white hover:bg-green-700' : 'bg-gray-300 text-gray-600 cursor-not-allowed'}`}
                             >
@@ -110,12 +109,12 @@ export default function VotingTab({
                 </div>
                 {!canVoteAndComment && isAuthReady && firebaseEnabled && (
                     <p className="text-center text-red-500 mt-4 text-sm">
-                        * لا يمكن التصويت حالياً. يرجى التأكد من إعداد Firebase الصحيح في تطبيقك وإعادة النشر بمسح ذاكرة التخزين المؤقت، أو تحديث الصفحة.
+                        * لا يمكن التصويت حالياً. يرجى التأكد من إعداد Firebase الصحيح في تطبيقك وتحديث الصفحة.
                     </p>
                 )}
             </div>
 
-            {/* Comments Section */}
+            {/* قسم التعليقات */}
             <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-6 rounded-xl shadow-inner border border-purple-200">
                 <h3 className="text-2xl font-bold text-purple-800 mb-4 text-center font-cairo-display">شاركوا بآرائكم وملاحظاتكم 💬</h3>
                 <div className="space-y-4 max-h-64 overflow-y-auto pr-2 pb-2">
@@ -138,11 +137,11 @@ export default function VotingTab({
                         placeholder="اكتب تعليقك هنا..."
                         value={newComment}
                         onChange={(e) => setNewComment(e.target.value)}
-                        disabled={!canVoteAndComment} // Disable textarea based on canVoteAndComment
+                        disabled={!canVoteAndComment} // تعطيل حقل النص بناءً على canVoteAndComment
                     ></textarea>
                     <button
                         onClick={handleAddComment}
-                        disabled={!canVoteAndComment || !newComment.trim()} // Disable button based on canVoteAndComment and text presence
+                        disabled={!canVoteAndComment || !newComment.trim()} // تعطيل الزر بناءً على canVoteAndComment ووجود نص
                         className={`px-6 py-3 rounded-full font-semibold text-base transition duration-300 transform hover:scale-105 shadow-md
                             ${canVoteAndComment && newComment.trim() ? 'bg-purple-600 text-white hover:bg-purple-700' : 'bg-gray-300 text-gray-600 cursor-not-allowed'}`}
                     >
@@ -151,12 +150,12 @@ export default function VotingTab({
                 </div>
                 {!canVoteAndComment && isAuthReady && firebaseEnabled && (
                     <p className="text-center text-red-500 mt-4 text-sm">
-                        * لا يمكن إضافة تعليق حالياً. يرجى التأكد من إعداد Firebase الصحيح في تطبيقك وإعادة النشر بمسح ذاكرة التخزين المؤقت، أو تحديث الصفحة.
+                        * لا يمكن إضافة تعليق حالياً. يرجى التأكد من إعداد Firebase الصحيح في تطبيقك وتحديث الصفحة.
                     </p>
                 )}
             </div>
 
-            {/* Role/Name Selection Modal */}
+            {/* نافذة اختيار الدور/الاسم (Modal) */}
             {showRoleSelectionModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-xl p-8 shadow-2xl max-w-md w-full text-center relative transform transition-all duration-300 scale-100">
@@ -189,7 +188,7 @@ export default function VotingTab({
                                 استخدام الاسم المخصص
                             </button>
                             <button
-                                onClick={() => selectRole('guest')} // Explicitly set to 'guest' role with 'مجهول' name
+                                onClick={() => selectRole('guest')} // يتم تعيين الدور 'guest' تلقائياً للاسم 'مجهول'
                                 className="w-full bg-gray-400 text-white px-6 py-3 rounded-full font-semibold text-lg hover:bg-gray-500 transition duration-300 transform hover:scale-105 shadow-md"
                             >
                                 البقاء مجهولاً
