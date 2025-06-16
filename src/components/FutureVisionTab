@@ -1,6 +1,6 @@
 import React from 'react';
 
-// هذا هو مكون FutureVisionTab.js
+// هذا هو مكون FutureVisionTab.js المحدث
 // يرجى حفظ هذا الكود في ملف جديد باسم FutureVisionTab.js في مجلد src/components
 
 const FutureVisionTab = ({
@@ -15,7 +15,7 @@ const FutureVisionTab = ({
     selectedAIVisualizationName,
     handleAIVisualization,
     staticAIVisualizations,
-    showTemporaryMessage,
+    showTemporaryMessage, // يجب أن يتم تمريرها الآن
 }) => {
     const nameKeys = ['يامن', 'غوث', 'غياث']; // قائمة بالأسماء للعرض في قسم التصور
 
