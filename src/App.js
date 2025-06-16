@@ -182,6 +182,7 @@ export default function App() {
     const [matchedCards, setMatchedCards] = useState([]);
     const [moves, setMoves] = useState(0);
     const [memoryGameMessage, setMemoryGameMessage] = useState('');
+    // eslint-disable-next-line no-unused-vars
     const memoryGamePairs = staticData.memoryGamePairs; // Use directly
 
     // حالة تعهد الوالدين (محفوظة في التخزين المحلي)
@@ -201,7 +202,9 @@ export default function App() {
     const authCheckComplete = useRef(false);
 
     // حالة العد التنازلي
+    // eslint-disable-next-line no-unused-vars
     const targetDate = React.useMemo(() => new Date('2025-06-03T00:00:00'), []);
+    // eslint-disable-next-line no-unused-vars
     const [countdown, setCountdown] = useState({});
 
     // ----- ألعاب جديدة للقسم "ألعاب مسلية" -----
@@ -249,6 +252,7 @@ export default function App() {
     const [selectedHistoricalName, setSelectedHistoricalName] = useState(null);
     const [historicalNameInput, setHistoricalNameInput] = useState('');
     const [historicalNameFact, setHistoricalNameFact] = useState('');
+    // eslint-disable-next-line no-unused-vars
     const historicalNamesData = staticData.historicalNamesData; // Use directly
 
     const [personalityImpactTestStarted, setPersonalityImpactTestStarted] = useState(false);
@@ -338,7 +342,7 @@ export default function App() {
             return initialScores;
         });
         setQuizResult(null);
-    }, [nameKeys]); // nameKeys is a constant from outer scope, linter might flag this as unnecessary, but it's okay for now.
+    }, [nameKeys]);
 
     const resetQuiz = useCallback(() => {
         setQuizStarted(false);
@@ -349,7 +353,7 @@ export default function App() {
             return initialScores;
         });
         setQuizResult(null);
-    }, [nameKeys]); // nameKeys is a constant from outer scope, linter might flag this as unnecessary, but it's okay for now.
+    }, [nameKeys]);
 
     const startTraitGame = useCallback(() => {
         setTraitGameStarted(true);
@@ -409,7 +413,7 @@ export default function App() {
                 setStoryGameStarted(false);
             }
         }, 1500);
-    }, [currentStoryIndex, storyQuestions, storyGameScore]); // storyGameScore here is used for logging score, not for state update based on previous state
+    }, [currentStoryIndex, storyQuestions, storyGameScore]);
 
     const resetStoryGame = useCallback(() => {
         setStoryGameStarted(false);
@@ -492,6 +496,13 @@ export default function App() {
         setMoves(0);
         setMemoryGameMessage('');
     }, [memoryGamePairs]); // Correct dependency
+
+    // دالة معالج لحجر النرد الاسمي
+    const handleDiceRoll = useCallback(() => {
+        const randomIndex = Math.floor(Math.random() * nameKeys.length);
+        const randomName = nameKeys[randomIndex];
+        showTemporaryMessage(`حجر النرد اختار: "${randomName}"! أتمنى له مستقبلاً باهراً!`, 'success', 4000);
+    }, [nameKeys, showTemporaryMessage]); // showTemporaryMessage is a dependency now
 
     const handlePersonalityAnswer = useCallback((scores) => {
         setPersonalityQuizScores(prevScores => {
