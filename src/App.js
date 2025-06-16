@@ -3,9 +3,9 @@ import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged }
 import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot } from 'firebase/firestore';
 import { initializeApp } from 'firebase/app';
 
-// استيراد المكونات الفرعية: تأكد من أن هذه المسارات وأسماء الملفات مطابقة تماماً
-// لأسمائها الفعلية في مجلد src لديك، مع مراعاة حساسية الأحرف الكبيرة والصغيرة.
-// تم إعادة إضافة امتداد .js إلى المسارات المحلية، حيث قد يكون ذلك مطلوباً في بيئة البناء الخاصة بك.
+// Import sub-components: Ensure these paths and filenames exactly match
+// their actual names in your src folder, respecting case sensitivity.
+// .js extension is re-added to local paths, as it might be required in your build environment.
 import AnalysisTab from './components/AnalysisTab.js';
 import ComparisonTab from './components/ComparisonTab.js';
 import VotingTab from './components/VotingTab.js';
@@ -14,15 +14,15 @@ import MessageTab from './components/MessageTab.js';
 import RecommendationTab from './components/RecommendationTab.js';
 import FutureVisionTab from './components/FutureVisionTab.js';
 import GemsTab from './components/GemsTab.js';
-import { staticData } from './data/staticData.js'; // استيراد البيانات الثابتة من ملف منفصل
+import { staticData } from './data/staticData.js'; // Import static data from a separate file
 
-// تعريف ما إذا كان التطبيق يعمل في بيئة Canvas (للتطوير المحلي مقابل نشر Netlify)
+// Define if the app is running in the Canvas environment (for local development vs. Netlify deployment)
 const IS_CANVAS_ENVIRONMENT = typeof window.__app_id !== 'undefined';
 
-// تحديد appId لمسارات Firestore.
+// Determine the appId for Firestore paths.
 const appId = IS_CANVAS_ENVIRONMENT ? window.__app_id : "alghazali-family-app-deploy";
 
-// تحديد إعدادات Firebase.
+// Determine Firebase configuration.
 const firebaseConfig = IS_CANVAS_ENVIRONMENT
     ? JSON.parse(window.__firebase_config)
     : {
@@ -35,7 +35,7 @@ const firebaseConfig = IS_CANVAS_ENVIRONMENT
         measurementId: "G-VJLS5W68E7"
     };
 
-// تهيئة خدمات Firebase بشكل شرطي
+// Initialize Firebase services conditionally
 let firestoreDbInstance;
 let firebaseAuthInstance;
 let firebaseEnabled = false;
@@ -59,7 +59,7 @@ if (shouldInitializeFirebase) {
     console.warn("Firebase configuration is incomplete for external deployment. Firebase functionality (votes, comments) will be mocked.");
 }
 
-// خدمات Firebase الوهمية إذا لم يتم تهيئة Firebase الحقيقي أو فشل
+// Mock Firebase services if real Firebase is not initialized or failed
 if (!firebaseEnabled) {
     firestoreDbInstance = {
         collection: () => ({ addDoc: () => Promise.resolve(), doc: () => ({}), onSnapshot: () => () => {}, query: () => ({}) }),
@@ -90,17 +90,17 @@ if (!firebaseEnabled) {
     };
 }
 
-// القائمة الرئيسية للأسماء المستخدمة في التطبيق لأقسام مختلفة
-// ملاحظة: nameKeys ثابت خارج المكون، لذا لا يحتاج ليكون تابعاً في useCallback
+// Main list of names used in the app for various sections
+// Note: nameKeys is constant outside the component, so it doesn't need to be a dependency in useCallback
 const nameKeys = ['يامن', 'غوث', 'غياث'];
 
-// تفاصيل الأسماء
+// Name details
 const nameDetails = staticData.nameDetails;
 
-// المحاور للتحليل التفصيلي في تبويب التحليل
+// Axes for detailed analysis in the Analysis tab
 const axes = staticData.axes;
 
-// بيانات مقارنة الأسماء، مع الفرز حسب النقاط
+// Name comparison data, sorted by score
 const comparisonData = nameKeys.map(name => ({
     name,
     score: nameDetails[name].score,
@@ -123,12 +123,12 @@ const sortedComparisonData = [...comparisonData].sort((a, b) => b.score - a.scor
 
 
 export default function App() {
-    // متغيرات الحالة لإدارة واجهة المستخدم والبيانات وتفاعلات المستخدم
+    // State variables for UI, data management, and user interactions
     const [activeTab, setActiveTab] = useState('analysis');
     // eslint-disable-next-line no-unused-vars
     const [showRecommendation, setShowRecommendation] = useState(false);
     const [userName, setUserName] = useState('');
-    const [userRole, setUserRole] = useState('guest');
+    const [userRole, setUserRole] = useState('guest'); // Role is now mostly for display/tracking, not strict access
     const [votes, setVotes] = useState({
         'يامن': 0,
         'غوث': 0,
@@ -139,9 +139,9 @@ export default function App() {
     const [currentUser, setCurrentUser] = useState(null);
     const [tempMessage, setTempMessage] = useState('');
     const [tempMessageType, setTempMessageType] = useState('info');
-    const [isAuthReady, setIsAuthReady] = useState(false); // حالة جديدة لتتبع جاهزية المصادقة
+    const [isAuthReady, setIsAuthReady] = useState(false); // New state to track authentication readiness
 
-    // حالات لـ "الذكاء الاصطناعي" (باستخدام محتوى ثابت)
+    // AI-related states (using static content)
     const [generatedBlessing, setGeneratedBlessing] = useState('');
     const [loadingBlessing, setLoadingBlessing] = useState(false);
     const [suggestedNamesForCard, setSuggestedNamesForCard] = useState({});
@@ -149,13 +149,13 @@ export default function App() {
     const [generatedPoem, setGeneratedPoem] = useState('');
     const [loadingPoem, setLoadingPoem] = useState(false);
 
-    // حالات لتحليل الاسم وتقديم الانطباع
+    // Name analysis and impression states
     const [expandedName, setExpandedName] = useState(null);
     const [funFact, setFunFact] = useState('');
     const [selectedImageMeaningName, setSelectedImageMeaningName] = useState(null);
     const [selectedPhoneticAnalysisName, setSelectedPhoneticAnalysisName] = useState(null);
 
-    // حالات لعبة اختبار الاسم المثالي
+    // Ideal Name Quiz Game states
     const [quizStarted, setQuizStarted] = useState(false);
     const [currentQuizQuestionIndex, setCurrentQuizQuestionIndex] = useState(0);
     const [quizScores, setQuizScores] = useState(() => {
@@ -166,21 +166,21 @@ export default function App() {
     const [quizResult, setQuizResult] = useState(null);
     const quizQuestions = staticData.quizQuestions;
 
-    // حالات لعبة مطابقة الصفة للاسم
+    // Trait Name Matching Game states
     const [traitGameStarted, setTraitGameStarted] = useState(false);
     const [currentTraitIndex, setCurrentTraitIndex] = useState(0);
     const [traitGameScore, setTraitGameScore] = useState(0);
     const [traitGameFeedback, setTraitGameFeedback] = useState('');
     const traitQuestions = staticData.traitQuestions;
 
-    // حالات لعبة إكمال قصة الاسم
+    // Name Story Completion Game states
     const [storyGameStarted, setStoryGameStarted] = useState(false);
     const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
     const [storyGameScore, setStoryGameScore] = useState(0);
     const [storyGameFeedback, setStoryGameFeedback] = useState('');
     const storyQuestions = staticData.storyQuestions;
 
-    // حالات لعبة تحدي الذاكرة الاسمية
+    // Name Memory Challenge Game states
     const [memoryGameStarted, setMemoryGameStarted] = useState(false);
     const [memoryCards, setMemoryCards] = useState([]);
     const [flippedCards, setFlippedCards] = useState([]);
@@ -190,29 +190,29 @@ export default function App() {
     // eslint-disable-next-line no-unused-vars
     const memoryGamePairs = staticData.memoryGamePairs; // Use directly
 
-    // حالة تعهد الوالدين (محفوظة في التخزين المحلي)
+    // Parents' Pledge state (saved in local storage)
     const [parentsPledge, setParentsPledge] = useState(() => localStorage.getItem('parentsPledge') || '');
 
-    // حالة تصميم الرؤية المستقبلية
+    // Future Vision Design state
     const [futureVisionNameInput, setFutureVisionNameInput] = useState('');
     const [futureVisionTraits, setFutureVisionTraits] = useState([]);
     const [futureVisionMotto, setFutureVisionMotto] = useState('');
     const [generatedFutureVision, setGeneratedFutureVision] = useState('');
 
-    // حالة تصور المولود بالذكاء الاصطناعي
+    // AI Baby Visualization state
     const [selectedAIVisualizationName, setSelectedAIVisualizationName] = useState(null);
 
-    // مرجع لتتبع ما إذا تم محاولة تسجيل الدخول الأولية في Firebase
+    // Ref to track if initial Firebase sign-in was attempted
     const initialSignInAttempted = useRef(false);
-    // تم إزالة authCheckComplete.current واستبدالها بـ isAuthReady
+    // authCheckComplete.current removed and replaced by isAuthReady
 
-    // حالة العد التنازلي
+    // Countdown state
     const targetDate = React.useMemo(() => new Date('2025-06-03T00:00:00'), []);
     // eslint-disable-next-line no-unused-vars
     const [countdown, setCountdown] = useState({});
 
-    // ----- ألعاب جديدة للقسم "ألعاب مسلية" -----
-    // 1. اختبار الشخصية بالأسماء
+    // ----- New games for "Fun Games" section -----
+    // 1. Name Personality Quiz
     const [personalityQuizStarted, setPersonalityQuizStarted] = useState(false);
     const [currentPersonalityQuestionIndex, setCurrentPersonalityQuestionIndex] = useState(0);
     const [personalityQuizScores, setPersonalityQuizScores] = useState({
@@ -221,14 +221,14 @@ export default function App() {
     const [personalityQuizResult, setPersonalityQuizResult] = useState(null);
     const personalityQuestions = staticData.personalityQuestions;
 
-    // 2. تحدي "من صاحب هذا الاسم؟"
+    // 2. Who Is It? Challenge
     const [whoIsItGameStarted, setWhoIsItGameStarted] = useState(false);
     const [currentWhoIsItQuestionIndex, setCurrentWhoIsItQuestionIndex] = useState(0);
     const [whoIsItGameScore, setWhoIsItGameScore] = useState(0);
     const [whoIsItGameFeedback, setWhoIsItGameFeedback] = useState('');
     const whoIsItQuestions = staticData.whoIsItQuestions;
 
-    // 3. لعبة باني الجمل الاسمية
+    // 3. Name Sentence Builder Game
     const [sentenceBuilderGameStarted, setSentenceBuilderGameStarted] = useState(false);
     const [currentSentenceName, setCurrentSentenceName] = useState('');
     const [userSentence, setUserSentence] = useState('');
@@ -236,7 +236,7 @@ export default function App() {
     const [scoreSentenceGame, setScoreSentenceGame] = useState(0);
     const namesForSentenceGame = staticData.namesForSentenceGame;
 
-    // 4. لعبة "ابحث عن الاسم المفقود" (لغز)
+    // 4. Find the Missing Name Game (Puzzle)
     const [missingNameGameStarted, setMissingNameGameStarted] = useState(false);
     const [currentMissingNamePuzzle, setCurrentMissingNamePuzzle] = useState(0);
     const [userMissingNameGuess, setUserMissingNameGuess] = useState('');
@@ -244,7 +244,7 @@ export default function App() {
     const [scoreMissingNameGame, setScoreMissingNameGame] = useState(0);
     const missingNamePuzzles = staticData.missingNamePuzzles;
 
-    // 5. لعبة "تصنيف الاسم" (تعليمي)
+    // 5. Name Categorization Game (Educational)
     const [categorizationGameStarted, setCategorizationGameStarted] = useState(false);
     const [currentCategorizationQuestionIndex, setCurrentCategorizationQuestionIndex] = useState(0);
     const [categorizationGameScore, setCategorizationGameScore] = useState(0);
@@ -252,7 +252,7 @@ export default function App() {
     const nameCategorizationQuestions = staticData.nameCategorizationQuestions;
 
 
-    // ----- حالات تبويب "دررٌ من الأسماء" -----
+    // ----- "Name Gems" tab states -----
     const [selectedHistoricalName, setSelectedHistoricalName] = useState(null);
     const [historicalNameInput, setHistoricalNameInput] = useState('');
     const [historicalNameFact, setHistoricalNameFact] = useState('');
@@ -265,7 +265,7 @@ export default function App() {
     const [impactTestResult, setImpactTestResult] = useState(null);
     const personalityImpactQuestions = staticData.personalityImpactQuestions;
 
-    // دالة لعرض الرسائل المؤقتة للمستخدم (مثل إشعارات النجاح/الخطأ)
+    // Function to display temporary messages to the user (e.g., success/error notifications)
     const showTemporaryMessage = useCallback((message, type = 'info', duration = 3000) => {
         setTempMessage(message);
         setTempMessageType(type);
@@ -278,9 +278,9 @@ export default function App() {
     }, []);
 
 
-    // ----------- دوال منطق الألعاب والمساعدات (تم نقلها من GamesTab لتجنب أخطاء Hooks و No-undef) -----------
+    // ----------- Game logic and helper functions (moved from GamesTab to avoid Hooks and No-undef errors) -----------
 
-    // دالة مساعدة لتحديد فئة الشخصية بناءً على الدرجات
+    // Helper function to determine personality type based on scores
     const getPersonalityType = useCallback((scores) => {
         let maxScore = -1;
         let personalityTypes = [];
@@ -505,7 +505,7 @@ export default function App() {
         setMemoryGameMessage('');
     }, []); // Removed memoryGamePairs from dependencies as it's a static import
 
-    // دالة معالج لحجر النرد الاسمي
+    // Handler for the Name Dice Roll
     const handleDiceRoll = useCallback(() => {
         const randomIndex = Math.floor(Math.random() * nameKeys.length);
         const randomName = nameKeys[randomIndex];
@@ -709,7 +709,7 @@ export default function App() {
         setCategorizationGameFeedback('');
     }, []);
 
-    // دالة مساعدة لجلب المحتوى الثابت (البركات، الحقائق الممتعة، الأسماء المشابهة، القصائد، أغاني المهد)
+    // Helper function to fetch static content (blessings, fun facts, similar names, poems, lullabies)
     const getStaticContent = useCallback((type, name = null) => {
         const data = staticData[type];
         if (name && data && typeof data === 'object' && !Array.isArray(data)) {
@@ -719,16 +719,16 @@ export default function App() {
     }, []);
 
 
-    // معالج لبركة الاسم
+    // Blessing handler
     const handleGenerateBlessing = useCallback(async (name) => {
         setLoadingBlessing(true);
         setGeneratedBlessing('');
-        const text = getStaticContent('blessings', name); // لاحظ استخدام 'blessings'
+        const text = getStaticContent('blessings', name); // Note 'blessings'
         setGeneratedBlessing(text);
         setLoadingBlessing(false);
     }, [getStaticContent]);
 
-    // معالج لاقتراح أسماء مشابهة
+    // Similar names suggestion handler
     const handleGenerateSimilarNames = useCallback(async (name) => {
         setLoadingSuggestions(true);
         setSuggestedNamesForCard(prev => ({ ...prev, [name]: '' }));
@@ -737,41 +737,41 @@ export default function App() {
         setLoadingSuggestions(false);
     }, [getStaticContent]);
 
-    // معالج للحقيقة الممتعة
+    // Fun fact handler
     const handleGenerateFunFact = useCallback(async (name) => {
         showTemporaryMessage(`جاري توليد معلومة شيقة عن اسم "${name}"...`, 'info', 2000);
-        const text = getStaticContent('funFacts', name); // لاحظ استخدام 'funFacts'
+        const text = getStaticContent('funFacts', name); // Note 'funFacts'
         setFunFact(text);
     }, [getStaticContent, showTemporaryMessage]);
 
-    // معالج لتوليد قصيدة
+    // Poem generation handler
     const handleGeneratePoem = useCallback(async (name) => {
         setLoadingPoem(true);
         setGeneratedPoem('');
-        const text = getStaticContent('namePoems', name); // لاحظ استخدام 'namePoems'
+        const text = getStaticContent('namePoems', name); // Note 'namePoems'
         setGeneratedPoem(text);
         setLoadingPoem(false);
     }, [getStaticContent]);
 
-    // معالج لعرض معنى الاسم من خلال الصور
+    // Image meaning display handler
     const handleShowImageMeaning = useCallback((name) => {
         setSelectedImageMeaningName(name);
         showTemporaryMessage(`صور توضيحية لاسم "${name}".`, 'info', 4000);
     }, [showTemporaryMessage]);
 
-    // معالج للتحليل الصوتي
+    // Phonetic analysis display handler
     const handleShowPhoneticAnalysis = useCallback((name) => {
         setSelectedPhoneticAnalysisName(name);
         showTemporaryMessage(`تحليل صوتي لاسم "${name}".`, 'info', 4000);
     }, [showTemporaryMessage]);
 
-    // معالج لتعهد الوالدين - حفظ في التخزين المحلي
+    // Parents' pledge handler - save to local storage
     const handlePledgeSave = useCallback(() => {
         localStorage.setItem('parentsPledge', parentsPledge);
         showTemporaryMessage("تم حفظ تعهدكما بنجاح!", 'success', 3000);
     }, [parentsPledge, showTemporaryMessage]);
 
-    // معالج لتوليد الرؤية المستقبلية
+    // Future Vision generation handler
     const handleGenerateFutureVision = useCallback(() => {
         if (!futureVisionNameInput.trim()) {
             showTemporaryMessage("الرجاء إدخال الاسم المقترح أولاً.", 'error', 3000);
@@ -793,13 +793,13 @@ export default function App() {
         showTemporaryMessage("تم توليد رؤيتكما المستقبلية!", 'success', 3000);
     }, [futureVisionNameInput, futureVisionTraits, futureVisionMotto, showTemporaryMessage]);
 
-    // معالج لتصور المولود بالذكاء الاصطناعي (باستخدام صور ثابتة)
+    // AI Baby visualization handler (using static images)
     const handleAIVisualization = useCallback((name) => {
         setSelectedAIVisualizationName(name);
         showTemporaryMessage(`تصور فني لجوهر اسم "${name}".`, 'info', 4000);
     }, [showTemporaryMessage]);
 
-    // دالة مساعدة لتحديد مدى تأثير الاسم على الشخصية بناءً على الدرجات
+    // Helper function to determine the impact of the name on personality based on scores
     const getImpactResult = useCallback((scores) => {
         let maxScore = -1;
         let dominantTrait = 'متوازن';
@@ -820,7 +820,7 @@ export default function App() {
         }
     }, []);
 
-    // معالج لأسئلة اختبار تأثير الاسم
+    // Handler for Name Impact Test questions
     const handleImpactAnswer = useCallback((scores) => {
         setImpactScores(prevScores => {
             const newScores = { ...prevScores };
@@ -848,12 +848,12 @@ export default function App() {
         setImpactTestResult(null);
     }, []);
 
-    // مصادقة Firebase والمستمعين
+    // Firebase authentication and listeners
     const setupFirebaseAuth = useCallback(async () => {
         if (!firebaseEnabled) {
             setCurrentUser({ uid: 'mock-user-id', isAnonymous: true });
             setUserName('مستخدم مجهول');
-            setUserRole('guest');
+            setUserRole('guest'); // Default to guest if Firebase is mocked
             setIsAuthReady(true); // Auth is "ready" even if mocked
             return;
         }
@@ -863,12 +863,15 @@ export default function App() {
         const unsubscribeAuth = onAuthStateChanged(authInstance, async (user) => {
             setCurrentUser(user);
             if (user) {
-                const storedRole = localStorage.getItem('userRole');
+                // Try to load stored user name/role, otherwise default to anonymous/guest
                 const storedName = localStorage.getItem('userName');
-                setUserRole(storedRole || (user.isAnonymous ? 'guest' : 'parent')); // استخدام المخزّن، وإلا فالافتراضي
-                setUserName(storedName || (user.isAnonymous ? 'مستخدم مجهول' : 'أحد الوالدين')); // استخدام المخزّن، وإلا فالافتراضي
+                const storedRole = localStorage.getItem('userRole');
+
+                setUserName(storedName || (user.isAnonymous ? 'مجهول' : 'مستخدم'));
+                setUserRole(storedRole || (user.isAnonymous ? 'guest' : 'authenticated'));
+
             } else {
-                // محاولة تسجيل الدخول المجهول فقط مرة واحدة لكل جلسة
+                // Attempt anonymous sign-in only once per session
                 if (!initialSignInAttempted.current) {
                     initialSignInAttempted.current = true;
                     try {
@@ -876,7 +879,7 @@ export default function App() {
                             await signInWithCustomToken(authInstance, window.__initial_auth_token);
                             console.log("Signed in with custom token.");
                         } else {
-                            // هذا هو المسار لـ Netlify إذا لم يتم توفير رمز مميز
+                            // This path is for Netlify if no token is provided, or for regular web
                             await signInAnonymously(authInstance);
                             console.log("Signed in anonymously.");
                         }
@@ -885,18 +888,18 @@ export default function App() {
                         if (firebaseEnabled) {
                             showTemporaryMessage("فشل تسجيل الدخول التلقائي. قد لا تعمل بعض الميزات.", 'error', 5000);
                         }
-                        setCurrentUser({ uid: 'fallback-user', isAnonymous: true });
+                        setCurrentUser(null); // Explicitly null if no user
                         setUserName('زائر');
                         setUserRole('guest');
                     }
                 } else {
-                    // إذا تمت محاولة تسجيل الدخول الأولية وفشلت بالفعل، أو قام المستخدم بتسجيل الخروج
-                    setCurrentUser(null); // صراحةً null إذا لم يكن هناك مستخدم
+                    // If initial sign-in attempt already failed, or user logged out
+                    setCurrentUser(null); // Explicitly null if no user
                     setUserName('زائر');
                     setUserRole('guest');
                 }
             }
-            setIsAuthReady(true); // فحص المصادقة قد اكتمل
+            setIsAuthReady(true); // Auth check completed
         });
 
         return () => unsubscribeAuth();
@@ -906,9 +909,9 @@ export default function App() {
         setupFirebaseAuth();
     }, [setupFirebaseAuth]);
 
-    // مستمعي Firestore للأصوات والتعليقات
+    // Firestore listeners for votes and comments
     useEffect(() => {
-        if (!isAuthReady || !firebaseEnabled || !currentUser) { // استخدم isAuthReady هنا
+        if (!isAuthReady || !firebaseEnabled || !currentUser) { // Use isAuthReady here
             setVotes({ 'يامن': 0, 'غوث': 0, 'غياث': 0 });
             setComments([]);
             return;
@@ -956,9 +959,9 @@ export default function App() {
         };
     }, [isAuthReady, currentUser, showTemporaryMessage]);
 
-    // معالج للتصويت على الاسم
+    // Handler for casting a vote
     const handleVote = useCallback(async (name) => {
-        if (!isAuthReady) { // تحقق من جاهزية المصادقة أولاً
+        if (!isAuthReady) { // Check for auth readiness first
             showTemporaryMessage("جاري تهيئة التطبيق. الرجاء المحاولة بعد قليل.", 'info', 3000);
             return;
         }
@@ -966,48 +969,51 @@ export default function App() {
             showTemporaryMessage("وظائف Firebase غير نشطة. لا يمكن حفظ التصويت.", 'error', 5000);
             return;
         }
-        if (!currentUser || currentUser.uid === 'mock-user-id' || currentUser.uid === 'fallback-user') {
-            showTemporaryMessage("يرجى تسجيل الدخول أو تحديث الصفحة للمشاركة في التصويت.", 'error', 5000);
+        // Allow any authenticated user (including anonymous) to vote
+        if (!currentUser || (currentUser.uid === 'mock-user-id' && !IS_CANVAS_ENVIRONMENT)) {
+            showTemporaryMessage("يرجى التأكد من اتصالك بالإنترنت أو تحديث الصفحة للمشاركة في التصويت.", 'error', 5000);
             return;
         }
-        if (userRole === 'guest') {
-            showTemporaryMessage("يرجى تحديد هويتكم (أب أو أم) قبل التصويت في قسم التصويت والآراء.", 'info', 5000);
-            return;
-        }
-
+        
         const currentUserId = currentUser.uid;
+        // The role/name is now optional for the voting record, but we'll use userName
+        const userDisplayRole = userName || (currentUser.isAnonymous ? 'مجهول' : 'مستخدم');
+
 
         try {
             const firestoreDb = firestoreDbInstance;
+            // Use a separate collection for tracking user's individual votes to prevent multiple votes
             const userVoteControlDocRef = doc(firestoreDb, `artifacts/${appId}/users/${currentUserId}/myVoteControl`, name);
             const userVoteControlSnap = await getDoc(userVoteControlDocRef);
 
             if (userVoteControlSnap.exists()) {
-                showTemporaryMessage(`لقد صوتّ ${userRole === 'father' ? 'الأب' : 'الأم'} بالفعل لاسم ${name}. لا يمكن التصويت مرة أخرى.`, 'info', 5000);
+                showTemporaryMessage(`لقد صوتت بالفعل لاسم ${name}. لا يمكن التصويت مرة أخرى.`, 'info', 5000);
                 return;
             }
 
+            // Record the public vote
             const publicVoteDocRef = doc(firestoreDb, `artifacts/${appId}/public/data/nameVotes`, `${name}_${currentUserId}_${Date.now()}`);
             await setDoc(publicVoteDocRef, {
                 name: name,
                 userId: currentUserId,
-                role: userRole,
+                userName: userDisplayRole, // Use the user-chosen/default name
                 timestamp: new Date()
             });
 
-            await setDoc(userVoteControlDocRef, { voted: true, timestamp: new Date() });
+            // Mark that this user has voted for this name
+            await setDoc(userVoteControlDocRef, { voted: true, timestamp: new Date(), userName: userDisplayRole });
 
             showTemporaryMessage(`تم التصويت لاسم ${name} بنجاح!`, 'success', 3000);
         } catch (error) {
             console.error("Error casting vote:", error);
             showTemporaryMessage("حدث خطأ أثناء التصويت. الرجاء المحاولة مرة أخرى.", 'error', 5000);
         }
-    }, [isAuthReady, currentUser, userRole, showTemporaryMessage]);
+    }, [isAuthReady, currentUser, firebaseEnabled, userName, showTemporaryMessage]);
 
 
-    // معالج لإضافة التعليقات
+    // Handler for adding comments
     const handleAddComment = useCallback(async () => {
-        if (!isAuthReady) { // تحقق من جاهزية المصادقة أولاً
+        if (!isAuthReady) { // Check for auth readiness first
             showTemporaryMessage("جاري تهيئة التطبيق. الرجاء المحاولة بعد قليل.", 'info', 3000);
             return;
         }
@@ -1019,24 +1025,22 @@ export default function App() {
             showTemporaryMessage("التعليق لا يمكن أن يكون فارغاً.", 'error', 3000);
             return;
         }
-        if (!currentUser || currentUser.uid === 'mock-user-id' || currentUser.uid === 'fallback-user') {
-            showTemporaryMessage("يرجى تسجيل الدخول أو تحديث الصفحة لإضافة تعليق.", 'error', 5000);
-            return;
-        }
-        if (userRole === 'guest') {
-            showTemporaryMessage("يرجى تحديد هويتكم (أب أو أم) قبل إضافة تعليق في قسم التصويت والآراء.", 'info', 5000);
+        // Allow any authenticated user (including anonymous) to comment
+        if (!currentUser || (currentUser.uid === 'mock-user-id' && !IS_CANVAS_ENVIRONMENT)) {
+            showTemporaryMessage("يرجى التأكد من اتصالك بالإنترنت أو تحديث الصفحة لإضافة تعليق.", 'error', 5000);
             return;
         }
 
         const currentUserId = currentUser.uid;
+        // The role/name is now optional for the comment, but we'll use userName
+        const userDisplayRole = userName || (currentUser.isAnonymous ? 'مجهول' : 'مستخدم');
 
         try {
             const firestoreDb = firestoreDbInstance;
             const commentsCollectionRef = collection(firestoreDb, `artifacts/${appId}/public/data/nameComments`);
             await setDoc(doc(commentsCollectionRef, `${currentUserId}_${Date.now()}`), {
                 userId: currentUserId,
-                userName: userName,
-                role: userRole,
+                userName: userDisplayRole, // Use the user-chosen/default name
                 text: newComment,
                 timestamp: new Date()
             });
@@ -1046,30 +1050,30 @@ export default function App() {
             console.error("Error adding comment:", error);
             showTemporaryMessage("حدث خطأ أثناء إضافة التعليق. الرجاء المحاولة مرة أخرى.", 'error', 5000);
         }
-    }, [isAuthReady, newComment, currentUser, userRole, userName, showTemporaryMessage]);
+    }, [isAuthReady, newComment, currentUser, firebaseEnabled, userName, showTemporaryMessage]);
 
-    // معالج لتغيير دور المستخدم (أب، أم، زائر)
+    // Handler for changing user role/name
     const handleUserRoleChange = useCallback((role, customName = '') => {
-        setUserRole(role);
+        setUserRole(role); // Store the role ('guest', 'father', 'mother', 'custom')
         let newUserName;
         if (role === 'father') {
             newUserName = 'الأب محمد';
         } else if (role === 'mother') {
             newUserName = 'الأم خلود';
         } else if (role === 'custom') {
-            newUserName = customName.trim() === '' ? 'مستخدم مجهول' : customName;
-        } else {
-            newUserName = 'مستخدم مجهول';
+            newUserName = customName.trim() === '' ? 'مجهول' : customName; // If custom is empty, default to 'مجهول'
+        } else { // 'guest' or any other default
+            newUserName = 'مجهول';
         }
         setUserName(newUserName);
-        // استمرارية دور المستخدم واسمه في التخزين المحلي
+        // Persist user role and name in local storage
         localStorage.setItem('userRole', role);
         localStorage.setItem('userName', newUserName);
         showTemporaryMessage(`تم تحديد هويتك كـ ${newUserName}.`, 'info', 3000);
     }, [showTemporaryMessage]);
 
 
-    // دالة لتحديد فئة الخلفية بناءً على التبويب النشط لتنوع بصري
+    // Function to determine background class based on active tab for visual variety
     const getBackgroundClasses = useCallback((tab) => {
         switch (tab) {
             case 'analysis': return 'bg-gradient-to-br from-blue-50 to-indigo-100';
@@ -1084,7 +1088,7 @@ export default function App() {
         }
     }, []);
 
-    // تأثير لـ Countdown
+    // Effect for Countdown
     useEffect(() => {
         const calculateCountdown = () => {
             const now = new Date();
@@ -1143,7 +1147,7 @@ export default function App() {
               `}
             </style>
 
-            {/* صندوق الرسائل المؤقتة للإشعارات (نجاح، خطأ، معلومات) */}
+            {/* Temporary message box for notifications (success, error, info) */}
             {tempMessage && (
                 <div id="temp-message-box" className={`fixed top-4 right-4 text-white p-3 rounded-lg shadow-lg z-50 animate-fadeInOut 
                     ${tempMessageType === 'error' ? 'bg-red-600' : (tempMessageType === 'success' ? 'bg-green-600' : 'bg-blue-600')}`}
@@ -1151,19 +1155,19 @@ export default function App() {
                     {tempMessage}
                 </div>
             )}
-            {/* تحذير إذا لم يتم تمكين Firebase (على سبيل المثال، تهيئة غير مكتملة) */}
+            {/* Warning if Firebase is not enabled (e.g., incomplete initialization) */}
             {!firebaseEnabled && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4 w-full max-w-xl text-center shadow-md animate-fadeIn">
                     <strong className="font-bold">تنبيه: </strong>
-                    <span className="block sm:inline">وظائف حفظ البيانات (التصويت، التعليقات) **معطلة حالياً**. يرجى إعداد مشروع Firebase الخاص بكم لتفعيلها لاحقاً.</span>
+                    <span className="block sm:inline">وظائف حفظ البيانات (التصويت، التعليقات) **معطلة**. يرجى إعداد مشروع Firebase الخاص بكم لتفعيلها.</span>
                 </div>
             )}
 
-            {/* حاوية التطبيق الرئيسية مع التنسيق المشترك */}
+            {/* Main app container with shared styling */}
             <div className="w-full max-w-6xl bg-white rounded-xl shadow-2xl overflow-hidden mb-8 transform transition-all duration-300">
-                {/* قسم الرأس مع العنوان والوصف والعد التنازلي */}
+                {/* Header section with title, description, and countdown */}
                 <header className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-6 rounded-t-xl text-center relative overflow-hidden">
-                    <div className="absolute inset-0 opacity-10 bg-pattern"></div> {/* خلفية زخرفية */}
+                    <div className="absolute inset-0 opacity-10 bg-pattern"></div> {/* Decorative background */}
                     <h1 className="text-4xl sm:text-5xl font-extrabold mb-2 leading-tight drop-shadow-lg font-cairo-display">
                         ✨ نجم العائلة: بوابة اختيار اسم مولودكما ✨
                     </h1>
@@ -1182,7 +1186,7 @@ export default function App() {
                     )}
                 </header>
 
-                {/* ألسنة التنقل - تم تعديلها لاستجابة أفضل وتوسيط */}
+                {/* Navigation tabs - adjusted for better responsiveness and centering */}
                 <nav className="bg-gradient-to-r from-blue-500 to-indigo-600 p-3 shadow-md">
                     <ul className="flex flex-wrap justify-center text-white font-semibold text-base sm:text-lg">
                         <li className={`flex-shrink-0 cursor-pointer px-3 py-2 rounded-full m-1 transition-all duration-300 ${activeTab === 'analysis' ? 'bg-white text-indigo-600 shadow-lg' : 'hover:bg-indigo-500'}`} onClick={() => setActiveTab('analysis')}>
@@ -1263,7 +1267,7 @@ export default function App() {
                             currentUser={currentUser}
                             showTemporaryMessage={showTemporaryMessage}
                             firebaseEnabled={firebaseEnabled}
-                            isAuthReady={isAuthReady} // تمرير حالة جاهزية المصادقة
+                            isAuthReady={isAuthReady} // Pass authentication readiness state
                         />
                     )}
 
@@ -1477,8 +1481,8 @@ export default function App() {
                     </button>
                 </footer>
             </div>
-            {/* يُفترض أن Tailwind CSS CDN متاح أو يتم إدارته بواسطة بيئة التضمين.
-                لـ HTML المستقل، سيكون هذا في <head>. */ }
+            {/* Tailwind CSS CDN is assumed to be available or managed by the embedding environment.
+                For standalone HTML, this would be in the <head>. */}
             <script src="https://cdn.tailwindcss.com"></script>
         </div>
     );
