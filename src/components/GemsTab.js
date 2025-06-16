@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react'; // إزالة useState إذا لم يكن مستخدماً داخلياً
 
 // هذا هو مكون GemsTab.js المحدث
 // يرجى حفظ هذا الكود في ملف جديد باسم GemsTab.js في مجلد src/components
@@ -13,17 +13,17 @@ const GemsTab = ({
     setHistoricalNameFact,
     personalityImpactTestStarted,
     currentImpactQuestionIndex,
-    personalityImpactQuestions, // يجب تمريرها
-    impactScores, // يجب تمريرها
-    impactTestResult, // يجب تمريرها
+    personalityImpactQuestions,
+    impactScores,
+    impactTestResult,
     setPersonalityImpactTestStarted,
     setCurrentImpactQuestionIndex,
     setImpactScores,
     setImpactTestResult,
-    showTemporaryMessage, // يجب تمريرها
-    handleImpactAnswer, // يجب تمريرها
-    resetImpactTest, // يجب تمريرها
-    getImpactResult // يجب تمريرها
+    showTemporaryMessage,
+    handleImpactAnswer,
+    resetImpactTest,
+    getImpactResult
 }) => {
     // دالة مساعدة لجلب معلومات الاسم التاريخية
     const getHistoricalNameFact = (name) => {
@@ -37,10 +37,6 @@ const GemsTab = ({
         }
         return "لا توجد معلومات تاريخية مفصلة لهذا الاسم في قاعدتنا الحالية.";
     };
-
-    // دوال getImpactResult, handleImpactAnswer, resetImpactTest
-    // تم نقلها إلى App.js ويتم تمريرها الآن كمفاتيح (props).
-    // لذلك، لا داعي لتعريفها هنا مرة أخرى.
 
     return (
         <section className="animate-fadeIn">
