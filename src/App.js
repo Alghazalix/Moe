@@ -122,6 +122,7 @@ const sortedComparisonData = [...comparisonData].sort((a, b) => b.score - a.scor
 export default function App() {
     // متغيرات الحالة لإدارة واجهة المستخدم والبيانات وتفاعلات المستخدم
     const [activeTab, setActiveTab] = useState('analysis');
+    // eslint-disable-next-line no-unused-vars
     const [showRecommendation, setShowRecommendation] = useState(false);
     const [userName, setUserName] = useState('');
     const [userRole, setUserRole] = useState('guest');
@@ -202,7 +203,6 @@ export default function App() {
     const authCheckComplete = useRef(false);
 
     // حالة العد التنازلي
-    // eslint-disable-next-line no-unused-vars
     const targetDate = React.useMemo(() => new Date('2025-06-03T00:00:00'), []);
     // eslint-disable-next-line no-unused-vars
     const [countdown, setCountdown] = useState({});
@@ -748,7 +748,7 @@ export default function App() {
     // معالج لعرض معنى الاسم من خلال الصور
     const handleShowImageMeaning = useCallback((name) => {
         setSelectedImageMeaningName(name);
-        showTemporaryMessage(`صور توضيحية لاسم "${name}" مع تفسيرها.`, 'info', 4000);
+        showTemporaryMessage(`صور توضيحية لاسم "${name}".`, 'info', 4000);
     }, [showTemporaryMessage]);
 
     // معالج للتحليل الصوتي
@@ -1303,7 +1303,7 @@ export default function App() {
                             resetMemoryGame={resetMemoryGame}
 
                             // Dice Roll
-                            handleDiceRoll={handleDiceRoll}
+                            handleDiceRoll={handleDiceRoll} {/* Passing the function down */}
 
                             // Personality Quiz (new)
                             personalityQuizStarted={personalityQuizStarted}
