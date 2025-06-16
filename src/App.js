@@ -3,16 +3,16 @@ import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged }
 import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot } from 'firebase/firestore';
 import { initializeApp } from 'firebase/app';
 
-// استيراد المكونات الفرعية
-import AnalysisTab from './components/AnalysisTab';
-import ComparisonTab from './components/ComparisonTab';
-import VotingTab from './components/VotingTab';
-import GamesTab from './components/GamesTab';
-import MessageTab from './components/MessageTab';
-import RecommendationTab from './components/RecommendationTab';
-import FutureVisionTab from './components/FutureVisionTab';
-import GemsTab from './components/GemsTab';
-import { staticData } from './data/staticData'; // استيراد البيانات الثابتة من ملف منفصل
+// استيراد المكونات الفرعية (تمت إضافة امتداد .js لضمان الحل)
+import AnalysisTab from './components/AnalysisTab.js';
+import ComparisonTab from './components/ComparisonTab.js';
+import VotingTab from './components/VotingTab.js';
+import GamesTab from './components/GamesTab.js';
+import MessageTab from './components/MessageTab.js';
+import RecommendationTab from './components/RecommendationTab.js';
+import FutureVisionTab from './components/FutureVisionTab.js';
+import GemsTab from './components/GemsTab.js';
+import { staticData } from './data/staticData.js'; // استيراد البيانات الثابتة من ملف منفصل (تمت إضافة امتداد .js)
 
 // تعريف ما إذا كان التطبيق يعمل في بيئة Canvas (للتطوير المحلي مقابل نشر Netlify)
 const IS_CANVAS_ENVIRONMENT = typeof window.__app_id !== 'undefined';
@@ -94,7 +94,7 @@ const nameKeys = ['يامن', 'غوث', 'غياث'];
 // تفاصيل الأسماء
 const nameDetails = staticData.nameDetails;
 
-// المحاور للتحليل التفصيلي في تبويب التحليل (تم نقلها إلى staticData.js)
+// المحاور للتحليل التفصيلي في تبويب التحليل
 const axes = staticData.axes;
 
 // بيانات مقارنة الأسماء، مع الفرز حسب النقاط
@@ -155,9 +155,7 @@ export default function App() {
     const [currentQuizQuestionIndex, setCurrentQuizQuestionIndex] = useState(0);
     const [quizScores, setQuizScores] = useState(() => {
         const initialScores = {};
-        if (Array.isArray(nameKeys)) {
-            nameKeys.forEach(name => { initialScores[name] = 0; });
-        }
+        nameKeys.forEach(name => { initialScores[name] = 0; });
         return initialScores;
     });
     const [quizResult, setQuizResult] = useState(null);
@@ -184,7 +182,7 @@ export default function App() {
     const [matchedCards, setMatchedCards] = useState([]);
     const [moves, setMoves] = useState(0);
     const [memoryGameMessage, setMemoryGameMessage] = useState('');
-    const memoryGamePairs = staticData.memoryGamePairs;
+    const memoryGamePairs = staticData.memoryGamePairs; // Use directly
 
     // حالة تعهد الوالدين (محفوظة في التخزين المحلي)
     const [parentsPledge, setParentsPledge] = useState(() => localStorage.getItem('parentsPledge') || '');
@@ -251,7 +249,7 @@ export default function App() {
     const [selectedHistoricalName, setSelectedHistoricalName] = useState(null);
     const [historicalNameInput, setHistoricalNameInput] = useState('');
     const [historicalNameFact, setHistoricalNameFact] = useState('');
-    const historicalNamesData = staticData.historicalNamesData;
+    const historicalNamesData = staticData.historicalNamesData; // Use directly
 
     const [personalityImpactTestStarted, setPersonalityImpactTestStarted] = useState(false);
     const [currentImpactQuestionIndex, setCurrentImpactQuestionIndex] = useState(0);
@@ -259,10 +257,23 @@ export default function App() {
     const [impactTestResult, setImpactTestResult] = useState(null);
     const personalityImpactQuestions = staticData.personalityImpactQuestions;
 
+    // دالة لعرض الرسائل المؤقتة للمستخدم (مثل إشعارات النجاح/الخطأ)
+    // IMPORTANT: This must be defined BEFORE any other useCallback/useEffect that uses it.
+    const showTemporaryMessage = useCallback((message, type = 'info', duration = 3000) => {
+        setTempMessage(message);
+        setTempMessageType(type);
+        const messageBox = document.getElementById('temp-message-box');
+        if (messageBox) {
+            messageBox.className = `fixed top-4 right-4 text-white p-3 rounded-lg shadow-lg z-50 animate-fadeInOut 
+                    ${type === 'error' ? 'bg-red-600' : (type === 'success' ? 'bg-green-600' : 'bg-blue-600')}`;
+        }
+        setTimeout(() => setTempMessage(''), duration); // تختفي الرسالة بعد 'duration' مللي ثانية
+    }, []);
+
 
     // ----------- دوال منطق الألعاب والمساعدات (تم نقلها من GamesTab لتجنب أخطاء Hooks و No-undef) -----------
 
-    // دالة مساعدة لتحديد فئة الشخصية بناءً على الدرجات (تم نقلها هنا)
+    // دالة مساعدة لتحديد فئة الشخصية بناءً على الدرجات
     const getPersonalityType = useCallback((scores) => {
         let maxScore = -1;
         let personalityTypes = [];
@@ -327,7 +338,7 @@ export default function App() {
             return initialScores;
         });
         setQuizResult(null);
-    }, [nameKeys]);
+    }, [nameKeys]); // nameKeys is a constant from outer scope, linter might flag this as unnecessary, but it's okay for now.
 
     const resetQuiz = useCallback(() => {
         setQuizStarted(false);
@@ -338,7 +349,7 @@ export default function App() {
             return initialScores;
         });
         setQuizResult(null);
-    }, [nameKeys]);
+    }, [nameKeys]); // nameKeys is a constant from outer scope, linter might flag this as unnecessary, but it's okay for now.
 
     const startTraitGame = useCallback(() => {
         setTraitGameStarted(true);
@@ -398,7 +409,7 @@ export default function App() {
                 setStoryGameStarted(false);
             }
         }, 1500);
-    }, [currentStoryIndex, storyQuestions, storyGameScore]);
+    }, [currentStoryIndex, storyQuestions, storyGameScore]); // storyGameScore here is used for logging score, not for state update based on previous state
 
     const resetStoryGame = useCallback(() => {
         setStoryGameStarted(false);
@@ -428,7 +439,7 @@ export default function App() {
                 setTimeout(() => {
                     setFlippedCards([]);
                     setMemoryGameMessage('');
-                    if (matchedCards.length + 2 === memoryCards.length) { // Corrected logic here
+                    if (matchedCards.length + 2 === memoryCards.length) {
                         setMemoryGameMessage(`رائع! أكملت اللعبة في ${moves + 1} نقلة!`);
                         setMemoryGameStarted(false);
                     }
@@ -451,7 +462,7 @@ export default function App() {
     }, [flippedCards, memoryCards, matchedCards, moves]);
 
     const startMemoryGame = useCallback(() => {
-        const cards = [...staticData.memoryGamePairs, ...staticData.memoryGamePairs].map((item, index) => ({
+        const cards = [...memoryGamePairs, ...memoryGamePairs].map((item, index) => ({ // Use memoryGamePairs directly
             ...item,
             uniqueId: `${item.id}-${item.vibe}-${index}`,
             isFlipped: false,
@@ -464,11 +475,11 @@ export default function App() {
         setMoves(0);
         setMemoryGameMessage('');
         setMemoryGameStarted(true);
-    }, []); // Removed staticData.memoryGamePairs from dependency as it's static
+    }, [memoryGamePairs]); // Correct dependency
 
     const resetMemoryGame = useCallback(() => {
         setMemoryGameStarted(false);
-        const cards = [...staticData.memoryGamePairs, ...staticData.memoryGamePairs].map((item, index) => ({
+        const cards = [...memoryGamePairs, ...memoryGamePairs].map((item, index) => ({ // Use memoryGamePairs directly
             ...item,
             uniqueId: `${item.id}-${item.vibe}-${index}`,
             isFlipped: false,
@@ -480,13 +491,7 @@ export default function App() {
         setMatchedCards([]);
         setMoves(0);
         setMemoryGameMessage('');
-    }, []); // Removed staticData.memoryGamePairs from dependency as it's static
-
-    const handleDiceRoll = useCallback(() => {
-        const randomIndex = Math.floor(Math.random() * nameKeys.length);
-        const randomName = nameKeys[randomIndex];
-        showTemporaryMessage(`حجر النرد اختار: "${randomName}"! أتمنى له مستقبلاً باهراً!`, 'success', 4000);
-    }, [nameKeys, showTemporaryMessage]);
+    }, [memoryGamePairs]); // Correct dependency
 
     const handlePersonalityAnswer = useCallback((scores) => {
         setPersonalityQuizScores(prevScores => {
@@ -775,7 +780,7 @@ export default function App() {
         showTemporaryMessage(`تصور فني لجوهر اسم "${name}".`, 'info', 4000);
     }, [showTemporaryMessage]);
 
-    // دالة مساعدة لتحديد مدى تأثير الاسم على الشخصية بناءً على الدرجات (نقلت هنا)
+    // دالة مساعدة لتحديد مدى تأثير الاسم على الشخصية بناءً على الدرجات
     const getImpactResult = useCallback((scores) => {
         let maxScore = -1;
         let dominantTrait = 'متوازن';
@@ -796,7 +801,7 @@ export default function App() {
         }
     }, []);
 
-    // معالج لأسئلة اختبار تأثير الاسم (نقلت هنا)
+    // معالج لأسئلة اختبار تأثير الاسم
     const handleImpactAnswer = useCallback((scores) => {
         setImpactScores(prevScores => {
             const newScores = { ...prevScores };
@@ -824,38 +829,23 @@ export default function App() {
         setImpactTestResult(null);
     }, []);
 
-
-    // دالة لعرض الرسائل المؤقتة للمستخدم (مثل إشعارات النجاح/الخطأ)
-    const showTemporaryMessage = useCallback((message, type = 'info', duration = 3000) => {
-        setTempMessage(message);
-        setTempMessageType(type);
-        const messageBox = document.getElementById('temp-message-box');
-        if (messageBox) {
-            messageBox.className = `fixed top-4 right-4 text-white p-3 rounded-lg shadow-lg z-50 animate-fadeInOut 
-                    ${type === 'error' ? 'bg-red-600' : (type === 'success' ? 'bg-green-600' : 'bg-blue-600')}`;
-        }
-        setTimeout(() => setTempMessage(''), duration); // تختفي الرسالة بعد 'duration' مللي ثانية
-    }, []);
-
     // مصادقة Firebase والمستمعين
     const setupFirebaseAuth = useCallback(async () => {
         if (!firebaseEnabled) {
             setCurrentUser({ uid: 'mock-user-id', isAnonymous: true });
             setUserName('مستخدم مجهول');
             setUserRole('guest');
-            authCheckComplete.current = true; // وضع علامة اكتمال فحص المصادقة حتى لـ Firebase الوهمي
+            authCheckComplete.current = true;
             return;
         }
 
-        const authInstance = firebaseAuthInstance; // استخدم نسخة الـ auth المهيأة
+        const authInstance = firebaseAuthInstance;
 
-        // مستمع onAuthStateChanged للتعامل مع تغييرات حالة المستخدم
         const unsubscribeAuth = onAuthStateChanged(authInstance, async (user) => {
             setCurrentUser(user);
             let userInitialized = false;
 
             if (user) {
-                // إذا كان المستخدم موجوداً (سجل الدخول)، حاول تحميل دوره/اسمه المحفوظ
                 const storedRole = localStorage.getItem('userRole');
                 const storedName = localStorage.getItem('userName');
 
@@ -863,68 +853,58 @@ export default function App() {
                     setUserRole(storedRole);
                     setUserName(storedName);
                 } else {
-                    // الاسم/الدور الافتراضي إذا لم يتم العثور عليه في التخزين المحلي
                     setUserName(user.isAnonymous ? 'مستخدم مجهول' : 'أحد الوالدين');
                     setUserRole(user.isAnonymous ? 'guest' : 'parent');
                 }
                 userInitialized = true;
             } else {
-                // إذا لم يكن هناك مستخدم، حاول تسجيل الدخول
                 if (!initialSignInAttempted.current) {
-                    initialSignInAttempted.current = true; // وضع علامة على المحاولة لمنع المحاولات المتعددة
+                    initialSignInAttempted.current = true;
                     try {
                         if (IS_CANVAS_ENVIRONMENT && typeof window.__initial_auth_token !== 'undefined') {
                             await signInWithCustomToken(authInstance, window.__initial_auth_token);
                             console.log("Signed in with custom token.");
-                            // مستمع onAuthStateChanged سيُطلق مرة أخرى مع المستخدم الجديد
                         } else {
                             await signInAnonymously(authInstance);
                             console.log("Signed in anonymously.");
-                            // مستمع onAuthStateChanged سيُطلق مرة أخرى مع المستخدم الجديد
                         }
                     } catch (error) {
                         console.error("Error during initial Firebase sign-in:", error);
-                        // أظهر الرسالة فقط إذا كان خطأ Firebase حقيقي، وليس وهمياً.
                         if (firebaseEnabled) {
                             showTemporaryMessage("فشل تسجيل الدخول التلقائي. قد لا تعمل بعض الميزات.", 'error', 5000);
                         }
-                        // تعيين مستخدم/دور احتياطي حتى إذا فشل تسجيل الدخول
                         setCurrentUser({ uid: 'fallback-user', isAnonymous: true });
                         setUserName('زائر');
                         setUserRole('guest');
                         userInitialized = true;
                     }
                 } else {
-                    // إذا تمت محاولة تسجيل الدخول الأولية ولم يكن هناك مستخدم، عيّن كزائر
                     setUserName('زائر');
                     setUserRole('guest');
                     userInitialized = true;
                 }
             }
             if (userInitialized) {
-                authCheckComplete.current = true; // وضع علامة اكتمال فحص المصادقة فقط بعد تحديد حالة المستخدم
+                authCheckComplete.current = true;
             }
         });
 
         return () => unsubscribeAuth();
-    }, [firebaseEnabled, showTemporaryMessage]); // أضف showTemporaryMessage كاعتمادية
+    }, [showTemporaryMessage]); // Dependency for showTemporaryMessage
 
-    // تأثير لتشغيل إعداد المصادقة عند تحميل المكون
     useEffect(() => {
         setupFirebaseAuth();
     }, [setupFirebaseAuth]);
 
     // مستمعي Firestore للأصوات والتعليقات
     useEffect(() => {
-        // تأكد من اكتمال فحص المصادقة قبل محاولة عمليات Firestore
         if (!authCheckComplete.current || !firebaseEnabled || !currentUser) {
-            // إعادة تعيين الأصوات والتعليقات إذا لم يتم تمكين Firebase أو لم يتم مصادقة المستخدم
             setVotes({ 'يامن': 0, 'غوث': 0, 'غياث': 0 });
             setComments([]);
             return;
         }
 
-        const firestoreDb = firestoreDbInstance; // استخدم نسخة الـ db المهيأة
+        const firestoreDb = firestoreDbInstance;
 
         const votesCollectionRef = collection(firestoreDb, `artifacts/${appId}/public/data/nameVotes`);
         const unsubscribeVotes = onSnapshot(votesCollectionRef, (snapshot) => {
@@ -949,14 +929,13 @@ export default function App() {
         const q = query(commentsCollectionRef);
         const unsubscribeComments = onSnapshot(q, (snapshot) => {
             const fetchedComments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            // فرز التعليقات حسب الطابع الزمني
             fetchedComments.sort((a, b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
             setComments(fetchedComments);
         }, (error) => {
             console.error("Error fetching comments:", error);
             let errorMessage = "تعذر جلب التعليقات من Firebase. قد تكون هناك مشكلة في الإعدادات.";
             if (error.code === 'unavailable') {
-                errorMessage = "تعذر الاتصال بخدمة Firebase (Firestore). يرجى التحقق من اتصال الإنترنت لديكم أو إعدادات Firebase الخاصة بالمشروع (مثل جدار الحماية أو قواعد الأمان في Firebase Console).";
+                errorMessage = "تعذر الاتصال بخدمة Firebase (Firestore). يرجre` التحقق من اتصال الإنترنت لديكم أو إعدادات Firebase الخاصة بالمشروع (مثل جدار الحماية أو قواعد الأمان في Firebase Console).";
             }
             showTemporaryMessage(errorMessage, 'error', 5000);
         });
@@ -965,7 +944,7 @@ export default function App() {
             unsubscribeVotes();
             unsubscribeComments();
         };
-    }, [currentUser, firebaseEnabled, appId, showTemporaryMessage]); // إضافة showTemporaryMessage كاعتمادية
+    }, [currentUser, showTemporaryMessage]); // firebaseEnabled and appId are correctly removed as dependencies here since they are effectively constants after initial setup
 
     // معالج للتصويت على الاسم
     const handleVote = useCallback(async (name) => {
@@ -986,7 +965,6 @@ export default function App() {
 
         try {
             const firestoreDb = firestoreDbInstance;
-            // التحقق مما إذا كان المستخدم قد صوت بالفعل لهذا الاسم لمنع الأصوات المتعددة
             const userVoteControlDocRef = doc(firestoreDb, `artifacts/${appId}/users/${currentUserId}/myVoteControl`, name);
             const userVoteControlSnap = await getDoc(userVoteControlDocRef);
 
@@ -995,7 +973,6 @@ export default function App() {
                 return;
             }
 
-            // سجل التصويت العام
             const publicVoteDocRef = doc(firestoreDb, `artifacts/${appId}/public/data/nameVotes`, `${name}_${currentUserId}_${Date.now()}`);
             await setDoc(publicVoteDocRef, {
                 name: name,
@@ -1004,7 +981,6 @@ export default function App() {
                 timestamp: new Date()
             });
 
-            // سجل أن هذا المستخدم قد صوت لهذا الاسم في وثيقة التحكم الخاصة به
             await setDoc(userVoteControlDocRef, { voted: true, timestamp: new Date() });
 
             showTemporaryMessage(`تم التصويت لاسم ${name} بنجاح!`, 'success', 3000);
@@ -1012,7 +988,7 @@ export default function App() {
             console.error("Error casting vote:", error);
             showTemporaryMessage("حدث خطأ أثناء التصويت. الرجاء المحاولة مرة أخرى.", 'error', 5000);
         }
-    }, [firebaseEnabled, currentUser, userRole, appId, showTemporaryMessage]);
+    }, [currentUser, userRole, showTemporaryMessage]); // firebaseEnabled and appId are correctly removed as dependencies here since they are effectively constants after initial setup
 
 
     // معالج لإضافة التعليقات
@@ -1052,7 +1028,7 @@ export default function App() {
             console.error("Error adding comment:", error);
             showTemporaryMessage("حدث خطأ أثناء إضافة التعليق. الرجاء المحاولة مرة أخرى.", 'error', 5000);
         }
-    }, [firebaseEnabled, newComment, currentUser, userRole, userName, appId, showTemporaryMessage]);
+    }, [newComment, currentUser, userRole, userName, showTemporaryMessage]); // firebaseEnabled and appId are correctly removed as dependencies here since they are effectively constants after initial setup
 
     // معالج لتغيير دور المستخدم (أب، أم، زائر)
     const handleUserRoleChange = useCallback((role, customName = '') => {
@@ -1089,6 +1065,31 @@ export default function App() {
             default: return 'bg-gradient-to-br from-blue-50 to-indigo-100';
         }
     }, []);
+
+    // تأثير لـ Countdown
+    useEffect(() => {
+        const calculateCountdown = () => {
+            const now = new Date();
+            const difference = targetDate.getTime() - now.getTime();
+
+            if (difference <= 0) {
+                setCountdown({ days: 0, hours: 0, minutes: 0, seconds: 0, message: "لقد وصل المولود المنتظر! تهانينا!" });
+                return;
+            }
+
+            const days = Math.floor(difference / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((difference % (1000 * 60)) / 1000);
+
+            setCountdown({ days, hours, minutes, seconds, message: '' });
+        };
+
+        calculateCountdown();
+        const timer = setInterval(calculateCountdown, 1000);
+
+        return () => clearInterval(timer);
+    }, [targetDate]);
 
     return (
         <div className={`font-inter min-h-screen p-4 sm:p-8 flex flex-col items-center transition-colors duration-500 ${getBackgroundClasses(activeTab)}`}>
@@ -1458,7 +1459,7 @@ export default function App() {
                 </footer>
             </div>
             {/* يُفترض أن Tailwind CSS CDN متاح أو يتم إدارته بواسطة بيئة التضمين.
-                لـ HTML المستقل، سيكون هذا في <head>. */}
+                لـ HTML المستقل، سيكون هذا في <head>. */ }
             <script src="https://cdn.tailwindcss.com"></script>
         </div>
     );
