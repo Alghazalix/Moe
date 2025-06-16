@@ -3,80 +3,8 @@ import React from 'react';
 // هذا هو مكون AnalysisTab.js المحدث
 // يرجى حفظ هذا الكود في ملف جديد باسم AnalysisTab.js في مجلد src/components
 
-// المحتوى الثابت (للتذكير، يتم استيراد هذه البيانات الآن من staticData.js)
-// ولكن تم الاحتفاظ بها هنا لضمان عدم وجود أخطاء في العرض إذا لم يتم ربط staticData بشكل صحيح
-const staticImageMeaningData = {
-    'يامن': {
-        images: [
-            "https://placehold.co/300x200/ADD8E6/FFFFFF?text=شروق+الشمس", // Light blue, sunrise
-            "https://placehold.co/300x200/90EE90/FFFFFF?text=حقل+زهور",   // Light green, flowers
-            "https://placehold.co/300x200/FFD700/FFFFFF?text=عملة+ذهبية"  // Gold, coin
-        ],
-        interpretation: "اسم 'يامن' يوحي بالخير والبركة. شروق الشمس يرمز لبداية جديدة وتفاؤل، حقل الزهور يمثل النماء والجمال، والعملة الذهبية ترمز للرخاء واليُمن. كل هذه الصور تعكس معاني البركة والازدهار المرتبطة بالاسم."
-    },
-    'غوث': {
-        images: [
-            "https://placehold.co/300x200/B22222/FFFFFF?text=قلعة+قوية",   // Firebrick, strong castle
-            "https://placehold.co/300x200/4682B4/FFFFFF?text=يدان+متعاونتان", // Steel blue, helping hands
-            "https://placehold.co/300x200/556B2F/FFFFFF?text=شجرة+عملاقة" // Dark olive green, giant tree
-        ],
-        interpretation: "اسم 'غوث' يرمز للقوة والنجدة والإغاثة. القلعة القوية تعكس الحماية والصلابة، الأيدي المتعاونة تدل على العون والمساعدة، والشجرة العملاقة توحي بالثبات والسند. هذه الصور تجسد معاني الغوث والمساندة."
-    },
-    'غياث': {
-        images: [
-            "https://placehold.co/300x200/008080/FFFFFF?text=مطر+غزير",  // Teal, heavy rain
-            "https://placehold.co/300x200/8A2BE2/FFFFFF?text=نهر+جاري", // Blue-violet, flowing river
-            "https://placehold.co/300x200/FF6347/FFFFFF?text=بذرة+تنمو" // Tomato, growing seed
-        ],
-        interpretation: "اسم 'غياث' يوحي بالعطاء الوفير والإنقاذ، مثل المطر الذي يحيي الأرض. المطر الغزير والنهر الجاري يرمزان للفيض والكرم، والبذرة التي تنمو تدل على الأثر الإيجابي والخير المستمر. تعكس هذه الصور معاني العطاء والإغاثة الكثيرة."
-    }
-};
-
-const staticNumerology = {
-    'يامن': { value: 7, trait: 'الاستقرار والحكمة، يميل إلى التفكير العميق والسعي نحو التوازن.' },
-    'غوث': { value: 5, trait: 'المغامرة والحرية، يحب التغيير ويكتشف آفاقاً جديدة.' },
-    'غياث': { value: 9, trait: 'العطاء والقيادة، يمتلك روحاً إنسانية ورغبة في إحداث فرق إيجابي.' },
-};
-
-const staticNameKeywords = {
-    'يامن': ['البركة', 'اليمن', 'التفاؤل', 'الهدوء', 'النجاح'],
-    'غوث': ['الشجاعة', 'النجدة', 'القوة', 'المبادرة', 'الإغاثة'],
-    'غياث': ['العطاء', 'المساعدة', 'القيادة', 'الإيجابية', 'الكرم'],
-};
-
-const staticPhoneticAnalysis = {
-    'يامن': {
-        vibration: 'إيقاع هادئ ومريح، يوحي بالسكينة والتناغم. سلس على الأذن واللسان.',
-        flow: 'تدفقه لغوي مريح، يجعله سهلاً في النطق والتذكر في مختلف السياقات.',
-        impact: 'يترك انطباعاً بالبركة والإيجابية، ويعزز شعوراً بالراحة والطمأنينة.'
-    },
-    'غوث': {
-        vibration: 'إيقاع قوي ومباشر، يوحي بالقوة والعزم. صوته جهوري ومميز.',
-        flow: 'تدفقه اللغوي حاد ومحدد، وقد يكون ثقيلاً بعض الشيء على غير الناطقين بحرف الغين.',
-        impact: 'يترك انطباعاً بالشجاعة والنجدة والمبادرة، ويُوحي بشخصية قادرة على العون.'
-    },
-    'غياث': {
-        vibration: 'إيقاع قوي وممتع، يوحي بالنشاط والحيوية. رنينه جذاب وواضح.',
-        flow: 'تدفقه اللغوي رشيق وسهل، مما يجعله مألوفاً ومحبباً للنطق.',
-        impact: 'يترك انطباعاً بالعطاء السخي والقيادة، ويعزز صورة شخصية إيجابية وفعالة.'
-    }
-};
-
-const staticAIVisualizations = { // Keep this local for now as it's not directly used from App.js in this tab
-    'يامن': {
-        image: "https://placehold.co/400x300/28A745/FFFFFF?text=نور+وتفاؤل",
-        description: "تصور فني لاسم 'يامن' يجسد هالة من النور الدافئ المحاطة برموز التفاؤل والبركة، مع خطوط انسيابية تعكس الحياة المليئة باليُمن والرخاء. الألوان السائدة هي الذهبي والأخضر الفاتح والأزرق السماوي، مما يوحي بالصفاء والنمو."
-    },
-    'غوث': {
-        image: "https://placehold.co/400x300/DC3545/FFFFFF?text=قوة+ونجدة",
-        description: "لوحة تجريدية لاسم 'غوث' تصور تشابكاً قوياً للخطوط والكتل التي توحي بالدعم والنجدة، مع ألوان داكنة تعكس الشجاعة والصلابة. تظهر أشكالاً رمزية للأيدي الممتدة أو الدروع، تعبيراً عن الحماية والعون."
-    },
-    'غياث': {
-        image: "https://placehold.co/400x300/007BFF/FFFFFF?text=عطاء+وفيض",
-        description: "تصور بصري لاسم 'غياث' يمثل تدفقاً متجدداً من الألوان الزرقاء والخضراء، يشبه فيض الماء الذي يروي الأرض. تتخلله نقاط براقة ترمز للعطاء السخي والتأثير الإيجابي على المحيط، مع لمسة من الأشكال الهندسية التي توحي بالقيادة والتنظيم."
-    }
-};
-
+// تمت إزالة تعريفات staticImageMeaningData, staticNumerology, staticNameKeywords, staticPhoneticAnalysis, staticAIVisualizations هنا
+// لأنها يتم تمريرها كـ props من App.js أو يتم الوصول إليها مباشرة من staticData في App.js
 
 const AnalysisCard = ({ name, details, isExpanded, onExpand, funFact, handleGenerateFunFact, suggestedNamesForCard, loadingSuggestions, handleGenerateSimilarNames, generatedPoem, loadingPoem, handleGeneratePoem, showTemporaryMessage, axes }) => {
     // Helper function to map axis names to their corresponding keys in nameDetails
@@ -100,14 +28,6 @@ const AnalysisCard = ({ name, details, isExpanded, onExpand, funFact, handleGene
             default: return "";
         }
     };
-    // Axes are now passed as a prop, no need to redefine them here
-    // const axes = [
-    //     "المعنى اللغوي", "التأثير النفسي", "الأهمية الثقافية", "الدلالة الدينية", "الشهرة والاستخدام",
-    //     "العملية وسهولة النطق", "التوقعات المستقبلية", "القوة الشخصية المتوقعة", "التوافق مع اللقب",
-    //     "الإيقاع الصوتي", "معاني أخرى في لغات مختلفة", "التفرد مقابل الشيوع", "القبول العام",
-    //     "التحليل الصوتي (تقريبي)", "بدائل تفسيرية"
-    // ];
-
     return (
         <div
             className={`bg-white rounded-xl shadow-xl p-6 transform transition-all duration-500 ease-in-out
@@ -157,9 +77,9 @@ const AnalysisCard = ({ name, details, isExpanded, onExpand, funFact, handleGene
                         <button
                             onClick={(e) => { e.stopPropagation(); handleGenerateSimilarNames(name); }}
                             className="w-full bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-full shadow-md transform transition-transform duration-300 hover:scale-105 focus:outline-none focus:ring-4 focus:ring-pink-300 flex items-center justify-center space-x-2 mt-4"
-                            disabled={loadingSuggestions} // Changed to single boolean
+                            disabled={loadingSuggestions}
                         >
-                            {loadingSuggestions ? ( // Changed to single boolean
+                            {loadingSuggestions ? (
                                 <>
                                     <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -216,7 +136,7 @@ const AnalysisCard = ({ name, details, isExpanded, onExpand, funFact, handleGene
 const AnalysisTab = ({
     nameKeys,
     nameDetails,
-    axes, // يجب أن يتم تمريرها الآن
+    axes,
     expandedName,
     setExpandedName,
     funFact,
@@ -227,25 +147,16 @@ const AnalysisTab = ({
     generatedPoem,
     loadingPoem,
     handleGeneratePoem,
-    staticNumerology,
-    staticNameKeywords,
-    staticImageMeaningData,
+    staticNumerology, // This is now passed directly from staticData
+    staticNameKeywords, // This is now passed directly from staticData
+    staticImageMeaningData, // This is now passed directly from staticData
     selectedImageMeaningName,
     handleShowImageMeaning,
-    staticPhoneticAnalysis,
+    staticPhoneticAnalysis, // This is now passed directly from staticData
     selectedPhoneticAnalysisName,
     handleShowPhoneticAnalysis,
-    showTemporaryMessage, // يجب أن يتم تمريرها الآن
+    showTemporaryMessage,
 }) => {
-    // Helper function to map axis names to their corresponding keys in nameDetails
-    // هذا موجود بالفعل في AnalysisCard
-    // const getAxisKey = (axis) => {
-    //     switch (axis) {
-    //         case "المعنى اللغوي": return "linguistic";
-    //         // ... rest of the cases
-    //         default: return "";
-    //     }
-    // };
     return (
         <section className="animate-fadeIn">
             <h2 className="text-3xl font-bold text-center text-indigo-700 mb-8 border-b-2 border-indigo-400 pb-4 font-cairo-display">
@@ -271,8 +182,8 @@ const AnalysisTab = ({
                         generatedPoem={generatedPoem}
                         loadingPoem={loadingPoem}
                         handleGeneratePoem={handleGeneratePoem}
-                        showTemporaryMessage={showTemporaryMessage} // تمرير showTemporaryMessage
-                        axes={axes} // تمرير axes
+                        showTemporaryMessage={showTemporaryMessage}
+                        axes={axes}
                     />
                 ))}
             </div>
