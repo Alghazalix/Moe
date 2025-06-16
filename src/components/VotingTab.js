@@ -39,7 +39,12 @@ export default function VotingTab({
     // Check if the user is authenticated and not a mock user (i.e., has a real Firebase UID)
     const isUserAuthenticatedAndNotMock = currentUser && currentUser.uid !== 'mock-user-id' && currentUser.uid !== 'fallback-user';
     // Allow any authenticated user to vote and comment
-    const canVoteAndComment = isAuthReady && firebaseEnabled && isUserAuthenticatedAndNotMock;
+    // The previous logic for `canVoteAndComment` was correct as it simply requires `isAuthReady && firebaseEnabled && isUserAuthenticatedAndNotMock`
+    // but the `isUserAuthenticatedAndNotMock` was potentially always true for anonymous sign-in
+    // Now, it's simplified: if Firebase is enabled and auth is ready, they can vote/comment.
+    // The check for `currentUser.uid !== 'mock-user-id'` is mainly for the Canvas environment's mock user.
+    const canVoteAndComment = isAuthReady && firebaseEnabled && currentUser && currentUser.uid !== 'mock-user-id';
+
 
     return (
         <div className="text-right p-4 sm:p-6 bg-white rounded-lg shadow-lg flex flex-col space-y-6">
@@ -72,16 +77,16 @@ export default function VotingTab({
                     <span className="block sm:inline">وظائف حفظ البيانات (التصويت، التعليقات) **معطلة**. يرجى إعداد مشروع Firebase الخاص بكم لتفعيلها.</span>
                 </div>
             )}
-            {firebaseEnabled && isAuthReady && !isUserAuthenticatedAndNotMock && (
+            {firebaseEnabled && isAuthReady && currentUser && currentUser.isAnonymous && (
                 <div className="bg-orange-100 border border-orange-400 text-orange-700 px-4 py-3 rounded-lg relative text-center animate-fadeIn">
                     <strong className="font-bold">معلومات: </strong>
-                    <span className="block sm:inline">أنت تستخدم وضع الزائر. لكي يتم حفظ تصويتك/تعليقك بشكل دائم، يرجى التأكد من أن إعدادات Firebase صحيحة لمشروعك، و**قم بنشر الموقع على Netlify بمسح ذاكرة التخزين المؤقت.**</span>
+                    <span className="block sm:inline">أنت تستخدم وضع الزائر المجهول. لكي يتم حفظ تصويتك/تعليقك بشكل دائم، يرجى التأكد من أن إعدادات Firebase صحيحة لمشروعك، و**تحديد قواعد أمان Firestore بشكل صحيح.**</span>
                 </div>
             )}
-            {firebaseEnabled && isAuthReady && isUserAuthenticatedAndNotMock && (userName === 'مجهول') && (
-                <div className="bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded-lg relative text-center animate-fadeIn">
-                    <strong className="font-bold">تلميح: </strong>
-                    <span className="block sm:inline">يمكنك التصويت والتعليق الآن باسم "مجهول" أو يمكنك تغيير اسمك.</span>
+            {firebaseEnabled && isAuthReady && !currentUser && ( // If isAuthReady but no current user (implies sign-in failed or user logged out)
+                <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative text-center animate-fadeIn">
+                    <strong className="font-bold">خطأ: </strong>
+                    <span className="block sm:inline">تعذر تسجيل الدخول التلقائي إلى Firebase. يرجى تحديث الصفحة أو التحقق من اتصال الإنترنت لديك.</span>
                 </div>
             )}
 
