@@ -1,16 +1,17 @@
 import React from 'react';
 
-// هذا هو مكون RecommendationTab.js
+// هذا هو مكون RecommendationTab.js المحدث
 // يرجى حفظ هذا الكود في ملف جديد باسم RecommendationTab.js في مجلد src/components
 
 const RecommendationTab = ({
-    sortedComparisonData,
+    sortedComparisonData, // يجب أن يتم تمريرها الآن
     showRecommendation,
     setShowRecommendation,
     nameDetails,
     generatedBlessing,
     loadingBlessing,
     handleGenerateBlessing,
+    showTemporaryMessage, // يجب أن يتم تمريرها الآن
 }) => {
     const suitableNames = sortedComparisonData;
 
@@ -24,7 +25,7 @@ const RecommendationTab = ({
     }
 
     // Sort the primary recommendations by score
-    primaryRecommendationNames.sort((a,b) => b.score - a.score);
+    primaryRecommendationNames.sort((a, b) => b.score - a.score);
 
     let finalRecommended = [];
     if (primaryRecommendationNames.length >= 2) {
