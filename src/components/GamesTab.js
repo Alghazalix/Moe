@@ -42,7 +42,7 @@ const GamesTab = ({
     startMemoryGame,
     resetMemoryGame,
     // Dice Roll
-    handleDiceRoll, // <--- تأكدنا من وجودها هنا
+    handleDiceRoll, // <--- تأكدنا من وجودها هنا واستقبالها كـ prop
     // Personality Quiz by Names
     personalityQuizStarted,
     currentPersonalityQuestionIndex,
