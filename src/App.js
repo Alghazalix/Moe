@@ -139,6 +139,7 @@ export default function App() {
     const [currentUser, setCurrentUser] = useState(null);
     const [tempMessage, setTempMessage] = useState('');
     const [tempMessageType, setTempMessageType] = useState('info');
+    const [isAuthReady, setIsAuthReady] = useState(false); // حالة جديدة لتتبع جاهزية المصادقة
 
     // حالات لـ "الذكاء الاصطناعي" (باستخدام محتوى ثابت)
     const [generatedBlessing, setGeneratedBlessing] = useState('');
@@ -203,7 +204,7 @@ export default function App() {
 
     // مرجع لتتبع ما إذا تم محاولة تسجيل الدخول الأولية في Firebase
     const initialSignInAttempted = useRef(false);
-    const authCheckComplete = useRef(false);
+    // تم إزالة authCheckComplete.current واستبدالها بـ isAuthReady
 
     // حالة العد التنازلي
     const targetDate = React.useMemo(() => new Date('2025-06-03T00:00:00'), []);
@@ -853,7 +854,7 @@ export default function App() {
             setCurrentUser({ uid: 'mock-user-id', isAnonymous: true });
             setUserName('مستخدم مجهول');
             setUserRole('guest');
-            authCheckComplete.current = true;
+            setIsAuthReady(true); // Auth is "ready" even if mocked
             return;
         }
 
@@ -861,21 +862,13 @@ export default function App() {
 
         const unsubscribeAuth = onAuthStateChanged(authInstance, async (user) => {
             setCurrentUser(user);
-            let userInitialized = false;
-
             if (user) {
                 const storedRole = localStorage.getItem('userRole');
                 const storedName = localStorage.getItem('userName');
-
-                if (storedRole && storedName) {
-                    setUserRole(storedRole);
-                    setUserName(storedName);
-                } else {
-                    setUserName(user.isAnonymous ? 'مستخدم مجهول' : 'أحد الوالدين');
-                    setUserRole(user.isAnonymous ? 'guest' : 'parent');
-                }
-                userInitialized = true;
+                setUserRole(storedRole || (user.isAnonymous ? 'guest' : 'parent')); // استخدام المخزّن، وإلا فالافتراضي
+                setUserName(storedName || (user.isAnonymous ? 'مستخدم مجهول' : 'أحد الوالدين')); // استخدام المخزّن، وإلا فالافتراضي
             } else {
+                // محاولة تسجيل الدخول المجهول فقط مرة واحدة لكل جلسة
                 if (!initialSignInAttempted.current) {
                     initialSignInAttempted.current = true;
                     try {
@@ -883,6 +876,7 @@ export default function App() {
                             await signInWithCustomToken(authInstance, window.__initial_auth_token);
                             console.log("Signed in with custom token.");
                         } else {
+                            // هذا هو المسار لـ Netlify إذا لم يتم توفير رمز مميز
                             await signInAnonymously(authInstance);
                             console.log("Signed in anonymously.");
                         }
@@ -894,17 +888,15 @@ export default function App() {
                         setCurrentUser({ uid: 'fallback-user', isAnonymous: true });
                         setUserName('زائر');
                         setUserRole('guest');
-                        userInitialized = true;
                     }
                 } else {
+                    // إذا تمت محاولة تسجيل الدخول الأولية وفشلت بالفعل، أو قام المستخدم بتسجيل الخروج
+                    setCurrentUser(null); // صراحةً null إذا لم يكن هناك مستخدم
                     setUserName('زائر');
                     setUserRole('guest');
-                    userInitialized = true;
                 }
             }
-            if (userInitialized) {
-                authCheckComplete.current = true;
-            }
+            setIsAuthReady(true); // فحص المصادقة قد اكتمل
         });
 
         return () => unsubscribeAuth();
@@ -916,7 +908,7 @@ export default function App() {
 
     // مستمعي Firestore للأصوات والتعليقات
     useEffect(() => {
-        if (!authCheckComplete.current || !firebaseEnabled || !currentUser) {
+        if (!isAuthReady || !firebaseEnabled || !currentUser) { // استخدم isAuthReady هنا
             setVotes({ 'يامن': 0, 'غوث': 0, 'غياث': 0 });
             setComments([]);
             return;
@@ -962,10 +954,14 @@ export default function App() {
             unsubscribeVotes();
             unsubscribeComments();
         };
-    }, [currentUser, showTemporaryMessage]);
+    }, [isAuthReady, currentUser, showTemporaryMessage]);
 
     // معالج للتصويت على الاسم
     const handleVote = useCallback(async (name) => {
+        if (!isAuthReady) { // تحقق من جاهزية المصادقة أولاً
+            showTemporaryMessage("جاري تهيئة التطبيق. الرجاء المحاولة بعد قليل.", 'info', 3000);
+            return;
+        }
         if (!firebaseEnabled) {
             showTemporaryMessage("وظائف Firebase غير نشطة. لا يمكن حفظ التصويت.", 'error', 5000);
             return;
@@ -1006,11 +1002,15 @@ export default function App() {
             console.error("Error casting vote:", error);
             showTemporaryMessage("حدث خطأ أثناء التصويت. الرجاء المحاولة مرة أخرى.", 'error', 5000);
         }
-    }, [currentUser, userRole, showTemporaryMessage]);
+    }, [isAuthReady, currentUser, userRole, showTemporaryMessage]);
 
 
     // معالج لإضافة التعليقات
     const handleAddComment = useCallback(async () => {
+        if (!isAuthReady) { // تحقق من جاهزية المصادقة أولاً
+            showTemporaryMessage("جاري تهيئة التطبيق. الرجاء المحاولة بعد قليل.", 'info', 3000);
+            return;
+        }
         if (!firebaseEnabled) {
             showTemporaryMessage("وظائف Firebase غير نشطة. لا يمكن حفظ التعليقات.", 'error', 5000);
             return;
@@ -1046,7 +1046,7 @@ export default function App() {
             console.error("Error adding comment:", error);
             showTemporaryMessage("حدث خطأ أثناء إضافة التعليق. الرجاء المحاولة مرة أخرى.", 'error', 5000);
         }
-    }, [newComment, currentUser, userRole, userName, showTemporaryMessage]);
+    }, [isAuthReady, newComment, currentUser, userRole, userName, showTemporaryMessage]);
 
     // معالج لتغيير دور المستخدم (أب، أم، زائر)
     const handleUserRoleChange = useCallback((role, customName = '') => {
@@ -1263,6 +1263,7 @@ export default function App() {
                             currentUser={currentUser}
                             showTemporaryMessage={showTemporaryMessage}
                             firebaseEnabled={firebaseEnabled}
+                            isAuthReady={isAuthReady} // تمرير حالة جاهزية المصادقة
                         />
                     )}
 
