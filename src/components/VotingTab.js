@@ -20,29 +20,24 @@ export default function VotingTab({
     const [customNameInput, setCustomNameInput] = useState('');
     const [showRoleSelectionModal, setShowRoleSelectionModal] = useState(false);
 
-    // Function to open the role selection modal
+    // دالة لفتح نافذة اختيار الدور
     const openRoleSelection = useCallback(() => {
         setShowRoleSelectionModal(true);
     }, []);
 
-    // Function to close the role selection modal
+    // دالة لإغلاق نافذة اختيار الدور
     const closeRoleSelection = useCallback(() => {
         setShowRoleSelectionModal(false);
     }, []);
 
-    // Function to select role and update name
+    // دالة لتغيير الدور وتحديث الاسم
     const selectRole = useCallback((role) => {
         handleUserRoleChange(role, customNameInput);
         closeRoleSelection();
     }, [handleUserRoleChange, customNameInput, closeRoleSelection]);
 
-    // Check if the user is authenticated and not a mock user (i.e., has a real Firebase UID)
-    const isUserAuthenticatedAndNotMock = currentUser && currentUser.uid !== 'mock-user-id' && currentUser.uid !== 'fallback-user';
-    // Allow any authenticated user to vote and comment
-    // The previous logic for `canVoteAndComment` was correct as it simply requires `isAuthReady && firebaseEnabled && isUserAuthenticatedAndNotMock`
-    // but the `isUserAuthenticatedAndNotMock` was potentially always true for anonymous sign-in
-    // Now, it's simplified: if Firebase is enabled and auth is ready, they can vote/comment.
-    // The check for `currentUser.uid !== 'mock-user-id'` is mainly for the Canvas environment's mock user.
+    // السماح لأي مستخدم مصادق عليه (بما في ذلك المجهولين) بالتصويت والتعليق
+    // تم تبسيط هذا الشرط ليتوافق مع رغبتك في التصويت للجميع
     const canVoteAndComment = isAuthReady && firebaseEnabled && currentUser && currentUser.uid !== 'mock-user-id';
 
 
