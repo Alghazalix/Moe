@@ -5,16 +5,16 @@ import { initializeApp } from 'firebase/app';
 
 // استيراد المكونات الفرعية: تأكد من أن هذه المسارات وأسماء الملفات مطابقة تماماً
 // لأسمائها الفعلية في مجلد src لديك، مع مراعاة حساسية الأحرف الكبيرة والصغيرة.
-// تم إزالة امتداد .js من المسارات المحلية، حيث يقوم نظام البناء عادةً بمعالجتها تلقائياً.
-import AnalysisTab from './components/AnalysisTab';
-import ComparisonTab from './components/ComparisonTab';
-import VotingTab from './components/VotingTab';
-import GamesTab from './components/GamesTab';
-import MessageTab from './components/MessageTab';
-import RecommendationTab from './components/RecommendationTab';
-import FutureVisionTab from './components/FutureVisionTab';
-import GemsTab from './components/GemsTab';
-import { staticData } from './data/staticData'; // استيراد البيانات الثابتة من ملف منفصل
+// تم إعادة إضافة امتداد .js إلى المسارات المحلية، حيث قد يكون ذلك مطلوباً في بيئة البناء الخاصة بك.
+import AnalysisTab from './components/AnalysisTab.js';
+import ComparisonTab from './components/ComparisonTab.js';
+import VotingTab from './components/VotingTab.js';
+import GamesTab from './components/GamesTab.js';
+import MessageTab from './components/MessageTab.js';
+import RecommendationTab from './components/RecommendationTab.js';
+import FutureVisionTab from './components/FutureVisionTab.js';
+import GemsTab from './components/GemsTab.js';
+import { staticData } from './data/staticData.js'; // استيراد البيانات الثابتة من ملف منفصل
 
 // تعريف ما إذا كان التطبيق يعمل في بيئة Canvas (للتطوير المحلي مقابل نشر Netlify)
 const IS_CANVAS_ENVIRONMENT = typeof window.__app_id !== 'undefined';
@@ -388,7 +388,7 @@ export default function App() {
                 showTemporaryMessage(`انتهت لعبة "من صاحب هذا الاسم؟" نتيجتك: ${traitGameScore + (selectedOption === currentQ.correctName ? 1 : 0)} من ${traitQuestions.length}`, 'info', 5000);
             }
         }, 1500);
-    }, [currentTraitIndex, traitQuestions, traitGameScore, showTemporaryMessage]); // Added traitGameScore back as a dependency
+    }, [currentTraitIndex, traitQuestions, traitGameScore, showTemporaryMessage]); // traitGameScore is correctly included here if needed for the final message.
 
     const resetTraitGame = useCallback(() => {
         setTraitGameStarted(false);
@@ -420,7 +420,7 @@ export default function App() {
                 setStoryGameStarted(false);
             }
         }, 1500);
-    }, [currentStoryIndex, storyQuestions, storyGameScore]); // Added storyGameScore back as a dependency
+    }, [currentStoryIndex, storyQuestions]); // Removed storyGameScore because setStoryGameScore uses a functional update. This was the exact error identified.
 
     const resetStoryGame = useCallback(() => {
         setStoryGameStarted(false);
