@@ -1,6 +1,6 @@
 import React from 'react';
 
-// هذا هو مكون MessageTab.js
+// هذا هو مكون MessageTab.js المحدث
 // يرجى حفظ هذا الكود في ملف جديد باسم MessageTab.js في مجلد src/components
 
 const MessageTab = ({ parentsPledge, setParentsPledge, handlePledgeSave, nameDetails, getStaticContent, showTemporaryMessage }) => {
