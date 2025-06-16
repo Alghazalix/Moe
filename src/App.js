@@ -1289,7 +1289,7 @@ export default function App() {
                             resetTraitGame={resetTraitGame}
 
                             // Story Game
-                            storyGameStarted={storyGameStarted}e
+                            storyGameStarted={storyGameStarted}
                             currentStoryIndex={currentStoryIndex}
                             storyGameScore={storyGameScore}
                             storyGameFeedback={storyGameFeedback}
