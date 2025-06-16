@@ -3,9 +3,9 @@ import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged }
 import { getFirestore, doc, setDoc, getDoc, collection, query, onSnapshot } from 'firebase/firestore';
 import { initializeApp } from 'firebase/app';
 
-// Import sub-components: Ensure these paths and filenames exactly match
-// their actual names in your src folder, respecting case sensitivity.
-// .js extension is re-added to local paths, as it might be required in your build environment.
+// استيراد المكونات الفرعية: تأكد من أن هذه المسارات وأسماء الملفات مطابقة تماماً
+// لأسمائها الفعلية في مجلد src لديك، مع مراعاة حساسية الأحرف الكبيرة والصغيرة.
+// تم إعادة إضافة امتداد .js إلى المسارات المحلية، حيث قد يكون ذلك مطلوباً في بيئة البناء الخاصة بك.
 import AnalysisTab from './components/AnalysisTab.js';
 import ComparisonTab from './components/ComparisonTab.js';
 import VotingTab from './components/VotingTab.js';
@@ -14,15 +14,15 @@ import MessageTab from './components/MessageTab.js';
 import RecommendationTab from './components/RecommendationTab.js';
 import FutureVisionTab from './components/FutureVisionTab.js';
 import GemsTab from './components/GemsTab.js';
-import { staticData } from './data/staticData.js'; // Import static data from a separate file
+import { staticData } from './data/staticData.js'; // استيراد البيانات الثابتة من ملف منفصل
 
-// Define if the app is running in the Canvas environment (for local development vs. Netlify deployment)
+// تعريف ما إذا كان التطبيق يعمل في بيئة Canvas (للتطوير المحلي مقابل نشر Netlify)
 const IS_CANVAS_ENVIRONMENT = typeof window.__app_id !== 'undefined';
 
-// Determine the appId for Firestore paths.
+// تحديد appId لمسارات Firestore.
 const appId = IS_CANVAS_ENVIRONMENT ? window.__app_id : "alghazali-family-app-deploy";
 
-// Determine Firebase configuration.
+// تحديد إعدادات Firebase.
 const firebaseConfig = IS_CANVAS_ENVIRONMENT
     ? JSON.parse(window.__firebase_config)
     : {
@@ -35,7 +35,7 @@ const firebaseConfig = IS_CANVAS_ENVIRONMENT
         measurementId: "G-VJLS5W68E7"
     };
 
-// Initialize Firebase services conditionally
+// تهيئة خدمات Firebase بشكل شرطي
 let firestoreDbInstance;
 let firebaseAuthInstance;
 let firebaseEnabled = false;
@@ -59,7 +59,7 @@ if (shouldInitializeFirebase) {
     console.warn("Firebase configuration is incomplete for external deployment. Firebase functionality (votes, comments) will be mocked.");
 }
 
-// Mock Firebase services if real Firebase is not initialized or failed
+// خدمات Firebase الوهمية إذا لم يتم تهيئة Firebase الحقيقي أو فشل
 if (!firebaseEnabled) {
     firestoreDbInstance = {
         collection: () => ({ addDoc: () => Promise.resolve(), doc: () => ({}), onSnapshot: () => () => {}, query: () => ({}) }),
@@ -90,17 +90,17 @@ if (!firebaseEnabled) {
     };
 }
 
-// Main list of names used in the app for various sections
-// Note: nameKeys is constant outside the component, so it doesn't need to be a dependency in useCallback
+// القائمة الرئيسية للأسماء المستخدمة في التطبيق لأقسام مختلفة
+// ملاحظة: nameKeys ثابت خارج المكون، لذا لا يحتاج ليكون تابعاً في useCallback
 const nameKeys = ['يامن', 'غوث', 'غياث'];
 
-// Name details
+// تفاصيل الأسماء
 const nameDetails = staticData.nameDetails;
 
-// Axes for detailed analysis in the Analysis tab
+// المحاور للتحليل التفصيلي في تبويب التحليل
 const axes = staticData.axes;
 
-// Name comparison data, sorted by score
+// بيانات مقارنة الأسماء، مع الفرز حسب النقاط
 const comparisonData = nameKeys.map(name => ({
     name,
     score: nameDetails[name].score,
@@ -123,7 +123,7 @@ const sortedComparisonData = [...comparisonData].sort((a, b) => b.score - a.scor
 
 
 export default function App() {
-    // State variables for UI, data management, and user interactions
+    // متغيرات الحالة لإدارة واجهة المستخدم والبيانات وتفاعلات المستخدم
     const [activeTab, setActiveTab] = useState('analysis');
     // eslint-disable-next-line no-unused-vars
     const [showRecommendation, setShowRecommendation] = useState(false);
@@ -139,9 +139,9 @@ export default function App() {
     const [currentUser, setCurrentUser] = useState(null);
     const [tempMessage, setTempMessage] = useState('');
     const [tempMessageType, setTempMessageType] = useState('info');
-    const [isAuthReady, setIsAuthReady] = useState(false); // New state to track authentication readiness
+    const [isAuthReady, setIsAuthReady] = useState(false); // حالة جديدة لتتبع جاهزية المصادقة
 
-    // AI-related states (using static content)
+    // حالات لـ "الذكاء الاصطناعي" (باستخدام محتوى ثابت)
     const [generatedBlessing, setGeneratedBlessing] = useState('');
     const [loadingBlessing, setLoadingBlessing] = useState(false);
     const [suggestedNamesForCard, setSuggestedNamesForCard] = useState({});
@@ -149,13 +149,13 @@ export default function App() {
     const [generatedPoem, setGeneratedPoem] = useState('');
     const [loadingPoem, setLoadingPoem] = useState(false);
 
-    // Name analysis and impression states
+    // حالات لتحليل الاسم وتقديم الانطباع
     const [expandedName, setExpandedName] = useState(null);
     const [funFact, setFunFact] = useState('');
     const [selectedImageMeaningName, setSelectedImageMeaningName] = useState(null);
     const [selectedPhoneticAnalysisName, setSelectedPhoneticAnalysisName] = useState(null);
 
-    // Ideal Name Quiz Game states
+    // حالات لعبة اختبار الاسم المثالي
     const [quizStarted, setQuizStarted] = useState(false);
     const [currentQuizQuestionIndex, setCurrentQuizQuestionIndex] = useState(0);
     const [quizScores, setQuizScores] = useState(() => {
@@ -166,21 +166,21 @@ export default function App() {
     const [quizResult, setQuizResult] = useState(null);
     const quizQuestions = staticData.quizQuestions;
 
-    // Trait Name Matching Game states
+    // حالات لعبة مطابقة الصفة للاسم
     const [traitGameStarted, setTraitGameStarted] = useState(false);
     const [currentTraitIndex, setCurrentTraitIndex] = useState(0);
     const [traitGameScore, setTraitGameScore] = useState(0);
     const [traitGameFeedback, setTraitGameFeedback] = useState('');
     const traitQuestions = staticData.traitQuestions;
 
-    // Name Story Completion Game states
+    // حالات لعبة إكمال قصة الاسم
     const [storyGameStarted, setStoryGameStarted] = useState(false);
     const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
     const [storyGameScore, setStoryGameScore] = useState(0);
     const [storyGameFeedback, setStoryGameFeedback] = useState('');
     const storyQuestions = staticData.storyQuestions;
 
-    // Name Memory Challenge Game states
+    // حالات لعبة تحدي الذاكرة الاسمية
     const [memoryGameStarted, setMemoryGameStarted] = useState(false);
     const [memoryCards, setMemoryCards] = useState([]);
     const [flippedCards, setFlippedCards] = useState([]);
@@ -190,29 +190,29 @@ export default function App() {
     // eslint-disable-next-line no-unused-vars
     const memoryGamePairs = staticData.memoryGamePairs; // Use directly
 
-    // Parents' Pledge state (saved in local storage)
+    // حالة تعهد الوالدين (محفوظة في التخزين المحلي)
     const [parentsPledge, setParentsPledge] = useState(() => localStorage.getItem('parentsPledge') || '');
 
-    // Future Vision Design state
+    // حالة تصميم الرؤية المستقبلية
     const [futureVisionNameInput, setFutureVisionNameInput] = useState('');
     const [futureVisionTraits, setFutureVisionTraits] = useState([]);
     const [futureVisionMotto, setFutureVisionMotto] = useState('');
     const [generatedFutureVision, setGeneratedFutureVision] = useState('');
 
-    // AI Baby Visualization state
+    // حالة تصور المولود بالذكاء الاصطناعي
     const [selectedAIVisualizationName, setSelectedAIVisualizationName] = useState(null);
 
-    // Ref to track if initial Firebase sign-in was attempted
+    // مرجع لتتبع ما إذا تم محاولة تسجيل الدخول الأولية في Firebase
     const initialSignInAttempted = useRef(false);
-    // authCheckComplete.current removed and replaced by isAuthReady
+    // تم إزالة authCheckComplete.current واستبدالها بـ isAuthReady
 
-    // Countdown state
+    // حالة العد التنازلي
     const targetDate = React.useMemo(() => new Date('2025-06-03T00:00:00'), []);
     // eslint-disable-next-line no-unused-vars
     const [countdown, setCountdown] = useState({});
 
-    // ----- New games for "Fun Games" section -----
-    // 1. Name Personality Quiz
+    // ----- ألعاب جديدة للقسم "ألعاب مسلية" -----
+    // 1. اختبار الشخصية بالأسماء
     const [personalityQuizStarted, setPersonalityQuizStarted] = useState(false);
     const [currentPersonalityQuestionIndex, setCurrentPersonalityQuestionIndex] = useState(0);
     const [personalityQuizScores, setPersonalityQuizScores] = useState({
@@ -221,14 +221,14 @@ export default function App() {
     const [personalityQuizResult, setPersonalityQuizResult] = useState(null);
     const personalityQuestions = staticData.personalityQuestions;
 
-    // 2. Who Is It? Challenge
+    // 2. تحدي "من صاحب هذا الاسم؟"
     const [whoIsItGameStarted, setWhoIsItGameStarted] = useState(false);
     const [currentWhoIsItQuestionIndex, setCurrentWhoIsItQuestionIndex] = useState(0);
     const [whoIsItGameScore, setWhoIsItGameScore] = useState(0);
     const [whoIsItGameFeedback, setWhoIsItGameFeedback] = useState('');
     const whoIsItQuestions = staticData.whoIsItQuestions;
 
-    // 3. Name Sentence Builder Game
+    // 3. لعبة باني الجمل الاسمية
     const [sentenceBuilderGameStarted, setSentenceBuilderGameStarted] = useState(false);
     const [currentSentenceName, setCurrentSentenceName] = useState('');
     const [userSentence, setUserSentence] = useState('');
@@ -236,7 +236,7 @@ export default function App() {
     const [scoreSentenceGame, setScoreSentenceGame] = useState(0);
     const namesForSentenceGame = staticData.namesForSentenceGame;
 
-    // 4. Find the Missing Name Game (Puzzle)
+    // 4. لعبة "ابحث عن الاسم المفقود" (لغز)
     const [missingNameGameStarted, setMissingNameGameStarted] = useState(false);
     const [currentMissingNamePuzzle, setCurrentMissingNamePuzzle] = useState(0);
     const [userMissingNameGuess, setUserMissingNameGuess] = useState('');
@@ -244,7 +244,7 @@ export default function App() {
     const [scoreMissingNameGame, setScoreMissingNameGame] = useState(0);
     const missingNamePuzzles = staticData.missingNamePuzzles;
 
-    // 5. Name Categorization Game (Educational)
+    // 5. لعبة "تصنيف الاسم" (تعليمي)
     const [categorizationGameStarted, setCategorizationGameStarted] = useState(false);
     const [currentCategorizationQuestionIndex, setCurrentCategorizationQuestionIndex] = useState(0);
     const [categorizationGameScore, setCategorizationGameScore] = useState(0);
@@ -252,7 +252,7 @@ export default function App() {
     const nameCategorizationQuestions = staticData.nameCategorizationQuestions;
 
 
-    // ----- "Name Gems" tab states -----
+    // ----- حالات تبويب "دررٌ من الأسماء" -----
     const [selectedHistoricalName, setSelectedHistoricalName] = useState(null);
     const [historicalNameInput, setHistoricalNameInput] = useState('');
     const [historicalNameFact, setHistoricalNameFact] = useState('');
@@ -265,7 +265,7 @@ export default function App() {
     const [impactTestResult, setImpactTestResult] = useState(null);
     const personalityImpactQuestions = staticData.personalityImpactQuestions;
 
-    // Function to display temporary messages to the user (e.g., success/error notifications)
+    // دالة لعرض الرسائل المؤقتة للمستخدم (مثل إشعارات النجاح/الخطأ)
     const showTemporaryMessage = useCallback((message, type = 'info', duration = 3000) => {
         setTempMessage(message);
         setTempMessageType(type);
@@ -278,9 +278,9 @@ export default function App() {
     }, []);
 
 
-    // ----------- Game logic and helper functions (moved from GamesTab to avoid Hooks and No-undef errors) -----------
+    // ----------- دوال منطق الألعاب والمساعدات (تم نقلها من GamesTab لتجنب أخطاء Hooks و No-undef) -----------
 
-    // Helper function to determine personality type based on scores
+    // دالة مساعدة لتحديد فئة الشخصية بناءً على الدرجات
     const getPersonalityType = useCallback((scores) => {
         let maxScore = -1;
         let personalityTypes = [];
@@ -1008,7 +1008,7 @@ export default function App() {
             console.error("Error casting vote:", error);
             showTemporaryMessage("حدث خطأ أثناء التصويت. الرجاء المحاولة مرة أخرى.", 'error', 5000);
         }
-    }, [isAuthReady, currentUser, firebaseEnabled, userName, showTemporaryMessage]);
+    }, [isAuthReady, currentUser, userName, showTemporaryMessage]); // Removed firebaseEnabled from dependencies as it's a global constant
 
 
     // Handler for adding comments
@@ -1050,7 +1050,7 @@ export default function App() {
             console.error("Error adding comment:", error);
             showTemporaryMessage("حدث خطأ أثناء إضافة التعليق. الرجاء المحاولة مرة أخرى.", 'error', 5000);
         }
-    }, [isAuthReady, newComment, currentUser, firebaseEnabled, userName, showTemporaryMessage]);
+    }, [isAuthReady, newComment, currentUser, userName, showTemporaryMessage]); // Removed firebaseEnabled from dependencies as it's a global constant
 
     // Handler for changing user role/name
     const handleUserRoleChange = useCallback((role, customName = '') => {
