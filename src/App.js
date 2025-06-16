@@ -852,7 +852,7 @@ export default function App() {
     const setupFirebaseAuth = useCallback(async () => {
         if (!firebaseEnabled) {
             setCurrentUser({ uid: 'mock-user-id', isAnonymous: true });
-            setUserName('مستخدم مجهول');
+            setUserName('مجهول');
             setUserRole('guest'); // Default to guest if Firebase is mocked
             setIsAuthReady(true); // Auth is "ready" even if mocked
             return;
@@ -889,13 +889,13 @@ export default function App() {
                             showTemporaryMessage("فشل تسجيل الدخول التلقائي. قد لا تعمل بعض الميزات.", 'error', 5000);
                         }
                         setCurrentUser(null); // Explicitly null if no user
-                        setUserName('زائر');
+                        setUserName('مجهول');
                         setUserRole('guest');
                     }
                 } else {
                     // If initial sign-in attempt already failed, or user logged out
                     setCurrentUser(null); // Explicitly null if no user
-                    setUserName('زائر');
+                    setUserName('مجهول');
                     setUserRole('guest');
                 }
             }
