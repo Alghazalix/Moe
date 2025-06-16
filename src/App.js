@@ -262,6 +262,31 @@ export default function App() {
 
     // ----------- دوال منطق الألعاب والمساعدات (تم نقلها من GamesTab لتجنب أخطاء Hooks و No-undef) -----------
 
+    // دالة مساعدة لتحديد فئة الشخصية بناءً على الدرجات (تم نقلها هنا)
+    const getPersonalityType = useCallback((scores) => {
+        let maxScore = -1;
+        let personalityTypes = [];
+        const typeMapping = {
+            'يامن': 'المتفائل والمبارك',
+            'غوث': 'الشجاع والقائد',
+            'غياث': 'المعطاء والمتعاون',
+            'مستكشف': 'المفكر والمستكشف',
+            'مبدع': 'المبدع والمبتكر',
+            'قيادي': 'القيادي الفعال',
+            'متعاون': 'المتعاون والمحبوب'
+        };
+
+        for (const type in scores) {
+            if (scores[type] > maxScore) {
+                maxScore = scores[type];
+                personalityTypes = [typeMapping[type] || type];
+            } else if (scores[type] === maxScore) {
+                personalityTypes.push(typeMapping[type] || type);
+            }
+        }
+        return personalityTypes.join(' أو ');
+    }, []);
+
     const handleQuizAnswer = useCallback((scores) => {
         setQuizScores(prevScores => {
             const newScores = { ...prevScores };
@@ -403,7 +428,7 @@ export default function App() {
                 setTimeout(() => {
                     setFlippedCards([]);
                     setMemoryGameMessage('');
-                    if (matchedCards.length + 2 === memoryCards.length) {
+                    if (matchedCards.length + 2 === memoryCards.length) { // Corrected logic here
                         setMemoryGameMessage(`رائع! أكملت اللعبة في ${moves + 1} نقلة!`);
                         setMemoryGameStarted(false);
                     }
@@ -439,7 +464,7 @@ export default function App() {
         setMoves(0);
         setMemoryGameMessage('');
         setMemoryGameStarted(true);
-    }, [staticData.memoryGamePairs]);
+    }, []); // Removed staticData.memoryGamePairs from dependency as it's static
 
     const resetMemoryGame = useCallback(() => {
         setMemoryGameStarted(false);
@@ -455,7 +480,7 @@ export default function App() {
         setMatchedCards([]);
         setMoves(0);
         setMemoryGameMessage('');
-    }, [staticData.memoryGamePairs]);
+    }, []); // Removed staticData.memoryGamePairs from dependency as it's static
 
     const handleDiceRoll = useCallback(() => {
         const randomIndex = Math.floor(Math.random() * nameKeys.length);
@@ -492,7 +517,7 @@ export default function App() {
             }
             setPersonalityQuizResult(getPersonalityType(finalScores));
         }
-    }, [currentPersonalityQuestionIndex, personalityQuestions.length, personalityQuizScores]);
+    }, [currentPersonalityQuestionIndex, personalityQuestions.length, personalityQuizScores, getPersonalityType]);
 
     const resetPersonalityQuiz = useCallback(() => {
         setPersonalityQuizStarted(false);
@@ -800,8 +825,258 @@ export default function App() {
     }, []);
 
 
+    // دالة لعرض الرسائل المؤقتة للمستخدم (مثل إشعارات النجاح/الخطأ)
+    const showTemporaryMessage = useCallback((message, type = 'info', duration = 3000) => {
+        setTempMessage(message);
+        setTempMessageType(type);
+        const messageBox = document.getElementById('temp-message-box');
+        if (messageBox) {
+            messageBox.className = `fixed top-4 right-4 text-white p-3 rounded-lg shadow-lg z-50 animate-fadeInOut 
+                    ${type === 'error' ? 'bg-red-600' : (type === 'success' ? 'bg-green-600' : 'bg-blue-600')}`;
+        }
+        setTimeout(() => setTempMessage(''), duration); // تختفي الرسالة بعد 'duration' مللي ثانية
+    }, []);
+
+    // مصادقة Firebase والمستمعين
+    const setupFirebaseAuth = useCallback(async () => {
+        if (!firebaseEnabled) {
+            setCurrentUser({ uid: 'mock-user-id', isAnonymous: true });
+            setUserName('مستخدم مجهول');
+            setUserRole('guest');
+            authCheckComplete.current = true; // وضع علامة اكتمال فحص المصادقة حتى لـ Firebase الوهمي
+            return;
+        }
+
+        const authInstance = firebaseAuthInstance; // استخدم نسخة الـ auth المهيأة
+
+        // مستمع onAuthStateChanged للتعامل مع تغييرات حالة المستخدم
+        const unsubscribeAuth = onAuthStateChanged(authInstance, async (user) => {
+            setCurrentUser(user);
+            let userInitialized = false;
+
+            if (user) {
+                // إذا كان المستخدم موجوداً (سجل الدخول)، حاول تحميل دوره/اسمه المحفوظ
+                const storedRole = localStorage.getItem('userRole');
+                const storedName = localStorage.getItem('userName');
+
+                if (storedRole && storedName) {
+                    setUserRole(storedRole);
+                    setUserName(storedName);
+                } else {
+                    // الاسم/الدور الافتراضي إذا لم يتم العثور عليه في التخزين المحلي
+                    setUserName(user.isAnonymous ? 'مستخدم مجهول' : 'أحد الوالدين');
+                    setUserRole(user.isAnonymous ? 'guest' : 'parent');
+                }
+                userInitialized = true;
+            } else {
+                // إذا لم يكن هناك مستخدم، حاول تسجيل الدخول
+                if (!initialSignInAttempted.current) {
+                    initialSignInAttempted.current = true; // وضع علامة على المحاولة لمنع المحاولات المتعددة
+                    try {
+                        if (IS_CANVAS_ENVIRONMENT && typeof window.__initial_auth_token !== 'undefined') {
+                            await signInWithCustomToken(authInstance, window.__initial_auth_token);
+                            console.log("Signed in with custom token.");
+                            // مستمع onAuthStateChanged سيُطلق مرة أخرى مع المستخدم الجديد
+                        } else {
+                            await signInAnonymously(authInstance);
+                            console.log("Signed in anonymously.");
+                            // مستمع onAuthStateChanged سيُطلق مرة أخرى مع المستخدم الجديد
+                        }
+                    } catch (error) {
+                        console.error("Error during initial Firebase sign-in:", error);
+                        // أظهر الرسالة فقط إذا كان خطأ Firebase حقيقي، وليس وهمياً.
+                        if (firebaseEnabled) {
+                            showTemporaryMessage("فشل تسجيل الدخول التلقائي. قد لا تعمل بعض الميزات.", 'error', 5000);
+                        }
+                        // تعيين مستخدم/دور احتياطي حتى إذا فشل تسجيل الدخول
+                        setCurrentUser({ uid: 'fallback-user', isAnonymous: true });
+                        setUserName('زائر');
+                        setUserRole('guest');
+                        userInitialized = true;
+                    }
+                } else {
+                    // إذا تمت محاولة تسجيل الدخول الأولية ولم يكن هناك مستخدم، عيّن كزائر
+                    setUserName('زائر');
+                    setUserRole('guest');
+                    userInitialized = true;
+                }
+            }
+            if (userInitialized) {
+                authCheckComplete.current = true; // وضع علامة اكتمال فحص المصادقة فقط بعد تحديد حالة المستخدم
+            }
+        });
+
+        return () => unsubscribeAuth();
+    }, [firebaseEnabled, showTemporaryMessage]); // أضف showTemporaryMessage كاعتمادية
+
+    // تأثير لتشغيل إعداد المصادقة عند تحميل المكون
+    useEffect(() => {
+        setupFirebaseAuth();
+    }, [setupFirebaseAuth]);
+
+    // مستمعي Firestore للأصوات والتعليقات
+    useEffect(() => {
+        // تأكد من اكتمال فحص المصادقة قبل محاولة عمليات Firestore
+        if (!authCheckComplete.current || !firebaseEnabled || !currentUser) {
+            // إعادة تعيين الأصوات والتعليقات إذا لم يتم تمكين Firebase أو لم يتم مصادقة المستخدم
+            setVotes({ 'يامن': 0, 'غوث': 0, 'غياث': 0 });
+            setComments([]);
+            return;
+        }
+
+        const firestoreDb = firestoreDbInstance; // استخدم نسخة الـ db المهيأة
+
+        const votesCollectionRef = collection(firestoreDb, `artifacts/${appId}/public/data/nameVotes`);
+        const unsubscribeVotes = onSnapshot(votesCollectionRef, (snapshot) => {
+            const currentVotes = { 'يامن': 0, 'غوث': 0, 'غياث': 0 };
+            snapshot.forEach((doc) => {
+                const data = doc.data();
+                if (data.name in currentVotes) {
+                    currentVotes[data.name] = (currentVotes[data.name] || 0) + 1;
+                }
+            });
+            setVotes(currentVotes);
+        }, (error) => {
+            console.error("Error fetching votes:", error);
+            let errorMessage = "تعذر جلب الأصوات من Firebase. قد تكون هناك مشكلة في الإعدادات.";
+            if (error.code === 'unavailable') {
+                errorMessage = "تعذر الاتصال بخدمة Firebase (Firestore). يرجى التحقق من اتصال الإنترنت لديكم أو إعدادات Firebase الخاصة بالمشروع (مثل جدار الحماية أو قواعد الأمان في Firebase Console).";
+            }
+            showTemporaryMessage(errorMessage, 'error', 5000);
+        });
+
+        const commentsCollectionRef = collection(firestoreDb, `artifacts/${appId}/public/data/nameComments`);
+        const q = query(commentsCollectionRef);
+        const unsubscribeComments = onSnapshot(q, (snapshot) => {
+            const fetchedComments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            // فرز التعليقات حسب الطابع الزمني
+            fetchedComments.sort((a, b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
+            setComments(fetchedComments);
+        }, (error) => {
+            console.error("Error fetching comments:", error);
+            let errorMessage = "تعذر جلب التعليقات من Firebase. قد تكون هناك مشكلة في الإعدادات.";
+            if (error.code === 'unavailable') {
+                errorMessage = "تعذر الاتصال بخدمة Firebase (Firestore). يرجى التحقق من اتصال الإنترنت لديكم أو إعدادات Firebase الخاصة بالمشروع (مثل جدار الحماية أو قواعد الأمان في Firebase Console).";
+            }
+            showTemporaryMessage(errorMessage, 'error', 5000);
+        });
+
+        return () => {
+            unsubscribeVotes();
+            unsubscribeComments();
+        };
+    }, [currentUser, firebaseEnabled, appId, showTemporaryMessage]); // إضافة showTemporaryMessage كاعتمادية
+
+    // معالج للتصويت على الاسم
+    const handleVote = useCallback(async (name) => {
+        if (!firebaseEnabled) {
+            showTemporaryMessage("وظائف Firebase غير نشطة. لا يمكن حفظ التصويت.", 'error', 5000);
+            return;
+        }
+        if (!currentUser || currentUser.uid === 'mock-user-id' || currentUser.uid === 'fallback-user') {
+            showTemporaryMessage("يرجى تسجيل الدخول أو تحديث الصفحة للمشاركة في التصويت.", 'error', 5000);
+            return;
+        }
+        if (userRole === 'guest') {
+            showTemporaryMessage("يرجى تحديد هويتكم (أب أو أم) قبل التصويت في قسم التصويت والآراء.", 'info', 5000);
+            return;
+        }
+
+        const currentUserId = currentUser.uid;
+
+        try {
+            const firestoreDb = firestoreDbInstance;
+            // التحقق مما إذا كان المستخدم قد صوت بالفعل لهذا الاسم لمنع الأصوات المتعددة
+            const userVoteControlDocRef = doc(firestoreDb, `artifacts/${appId}/users/${currentUserId}/myVoteControl`, name);
+            const userVoteControlSnap = await getDoc(userVoteControlDocRef);
+
+            if (userVoteControlSnap.exists()) {
+                showTemporaryMessage(`لقد صوتّ ${userRole === 'father' ? 'الأب' : 'الأم'} بالفعل لاسم ${name}. لا يمكن التصويت مرة أخرى.`, 'info', 5000);
+                return;
+            }
+
+            // سجل التصويت العام
+            const publicVoteDocRef = doc(firestoreDb, `artifacts/${appId}/public/data/nameVotes`, `${name}_${currentUserId}_${Date.now()}`);
+            await setDoc(publicVoteDocRef, {
+                name: name,
+                userId: currentUserId,
+                role: userRole,
+                timestamp: new Date()
+            });
+
+            // سجل أن هذا المستخدم قد صوت لهذا الاسم في وثيقة التحكم الخاصة به
+            await setDoc(userVoteControlDocRef, { voted: true, timestamp: new Date() });
+
+            showTemporaryMessage(`تم التصويت لاسم ${name} بنجاح!`, 'success', 3000);
+        } catch (error) {
+            console.error("Error casting vote:", error);
+            showTemporaryMessage("حدث خطأ أثناء التصويت. الرجاء المحاولة مرة أخرى.", 'error', 5000);
+        }
+    }, [firebaseEnabled, currentUser, userRole, appId, showTemporaryMessage]);
+
+
+    // معالج لإضافة التعليقات
+    const handleAddComment = useCallback(async () => {
+        if (!firebaseEnabled) {
+            showTemporaryMessage("وظائف Firebase غير نشطة. لا يمكن حفظ التعليقات.", 'error', 5000);
+            return;
+        }
+        if (!newComment.trim()) {
+            showTemporaryMessage("التعليق لا يمكن أن يكون فارغاً.", 'error', 3000);
+            return;
+        }
+        if (!currentUser || currentUser.uid === 'mock-user-id' || currentUser.uid === 'fallback-user') {
+            showTemporaryMessage("يرجى تسجيل الدخول أو تحديث الصفحة لإضافة تعليق.", 'error', 5000);
+            return;
+        }
+        if (userRole === 'guest') {
+            showTemporaryMessage("يرجى تحديد هويتكم (أب أو أم) قبل إضافة تعليق في قسم التصويت والآراء.", 'info', 5000);
+            return;
+        }
+
+        const currentUserId = currentUser.uid;
+
+        try {
+            const firestoreDb = firestoreDbInstance;
+            const commentsCollectionRef = collection(firestoreDb, `artifacts/${appId}/public/data/nameComments`);
+            await setDoc(doc(commentsCollectionRef, `${currentUserId}_${Date.now()}`), {
+                userId: currentUserId,
+                userName: userName,
+                role: userRole,
+                text: newComment,
+                timestamp: new Date()
+            });
+            setNewComment('');
+            showTemporaryMessage("تم إضافة تعليقك بنجاح!", 'success', 3000);
+        } catch (error) {
+            console.error("Error adding comment:", error);
+            showTemporaryMessage("حدث خطأ أثناء إضافة التعليق. الرجاء المحاولة مرة أخرى.", 'error', 5000);
+        }
+    }, [firebaseEnabled, newComment, currentUser, userRole, userName, appId, showTemporaryMessage]);
+
+    // معالج لتغيير دور المستخدم (أب، أم، زائر)
+    const handleUserRoleChange = useCallback((role, customName = '') => {
+        setUserRole(role);
+        let newUserName;
+        if (role === 'father') {
+            newUserName = 'الأب محمد';
+        } else if (role === 'mother') {
+            newUserName = 'الأم خلود';
+        } else if (role === 'custom') {
+            newUserName = customName.trim() === '' ? 'مستخدم مجهول' : customName;
+        } else {
+            newUserName = 'مستخدم مجهول';
+        }
+        setUserName(newUserName);
+        // استمرارية دور المستخدم واسمه في التخزين المحلي
+        localStorage.setItem('userRole', role);
+        localStorage.setItem('userName', newUserName);
+        showTemporaryMessage(`تم تحديد هويتك كـ ${newUserName}.`, 'info', 3000);
+    }, [showTemporaryMessage]);
+
+
     // دالة لتحديد فئة الخلفية بناءً على التبويب النشط لتنوع بصري
-    const getBackgroundClasses = (tab) => {
+    const getBackgroundClasses = useCallback((tab) => {
         switch (tab) {
             case 'analysis': return 'bg-gradient-to-br from-blue-50 to-indigo-100';
             case 'comparison': return 'bg-gradient-to-br from-purple-50 to-pink-100';
@@ -813,16 +1088,19 @@ export default function App() {
             case 'gems': return 'bg-gradient-to-br from-gray-50 to-gray-200';
             default: return 'bg-gradient-to-br from-blue-50 to-indigo-100';
         }
-    };
+    }, []);
 
     return (
         <div className={`font-inter min-h-screen p-4 sm:p-8 flex flex-col items-center transition-colors duration-500 ${getBackgroundClasses(activeTab)}`}>
+            {/* Inline style for Cairo font to ensure it compiles correctly with Tailwind.
+                This is important for custom font usage in environments without direct CSS file control. */}
             <style>
               {`
                 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;800&display=swap');
                 .font-cairo-display {
                   font-family: 'Cairo', sans-serif;
                 }
+                /* Custom animation for text bounce, to be reused */
                 @keyframes bounce-text-once {
                     0%, 100% {
                         transform: translateY(0);
@@ -846,6 +1124,7 @@ export default function App() {
               `}
             </style>
 
+            {/* صندوق الرسائل المؤقتة للإشعارات (نجاح، خطأ، معلومات) */}
             {tempMessage && (
                 <div id="temp-message-box" className={`fixed top-4 right-4 text-white p-3 rounded-lg shadow-lg z-50 animate-fadeInOut 
                     ${tempMessageType === 'error' ? 'bg-red-600' : (tempMessageType === 'success' ? 'bg-green-600' : 'bg-blue-600')}`}
@@ -853,6 +1132,7 @@ export default function App() {
                     {tempMessage}
                 </div>
             )}
+            {/* تحذير إذا لم يتم تمكين Firebase (على سبيل المثال، تهيئة غير مكتملة) */}
             {!firebaseEnabled && (
                 <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-4 w-full max-w-xl text-center shadow-md animate-fadeIn">
                     <strong className="font-bold">تنبيه: </strong>
@@ -860,9 +1140,11 @@ export default function App() {
                 </div>
             )}
 
+            {/* حاوية التطبيق الرئيسية مع التنسيق المشترك */}
             <div className="w-full max-w-6xl bg-white rounded-xl shadow-2xl overflow-hidden mb-8 transform transition-all duration-300">
+                {/* قسم الرأس مع العنوان والوصف والعد التنازلي */}
                 <header className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white p-6 rounded-t-xl text-center relative overflow-hidden">
-                    <div className="absolute inset-0 opacity-10 bg-pattern"></div>
+                    <div className="absolute inset-0 opacity-10 bg-pattern"></div> {/* خلفية زخرفية */}
                     <h1 className="text-4xl sm:text-5xl font-extrabold mb-2 leading-tight drop-shadow-lg font-cairo-display">
                         ✨ نجم العائلة: بوابة اختيار اسم مولودكما ✨
                     </h1>
@@ -881,6 +1163,7 @@ export default function App() {
                     )}
                 </header>
 
+                {/* ألسنة التنقل - تم تعديلها لاستجابة أفضل وتوسيط */}
                 <nav className="bg-gradient-to-r from-blue-500 to-indigo-600 p-3 shadow-md">
                     <ul className="flex flex-wrap justify-center text-white font-semibold text-base sm:text-lg">
                         <li className={`flex-shrink-0 cursor-pointer px-3 py-2 rounded-full m-1 transition-all duration-300 ${activeTab === 'analysis' ? 'bg-white text-indigo-600 shadow-lg' : 'hover:bg-indigo-500'}`} onClick={() => setActiveTab('analysis')}>
@@ -915,7 +1198,7 @@ export default function App() {
                         <AnalysisTab
                             nameKeys={nameKeys}
                             nameDetails={nameDetails}
-                            axes={axes} // تمرير axes
+                            axes={axes}
                             expandedName={expandedName}
                             setExpandedName={setExpandedName}
                             funFact={funFact}
@@ -941,7 +1224,7 @@ export default function App() {
 
                     {activeTab === 'comparison' && (
                         <ComparisonTab
-                            sortedComparisonData={sortedComparisonData} // تمرير sortedComparisonData
+                            sortedComparisonData={sortedComparisonData}
                         />
                     )}
 
@@ -971,10 +1254,10 @@ export default function App() {
                             quizStarted={quizStarted}
                             currentQuizQuestionIndex={currentQuizQuestionIndex}
                             quizQuestions={quizQuestions}
-                            handleQuizAnswer={handleQuizAnswer} // تمرير الدالة
+                            handleQuizAnswer={handleQuizAnswer}
                             quizResult={quizResult}
-                            startQuiz={startQuiz} // تمرير الدالة
-                            resetQuiz={resetQuiz} // تمرير الدالة
+                            startQuiz={startQuiz}
+                            resetQuiz={resetQuiz}
 
                             // Trait Game
                             traitGameStarted={traitGameStarted}
@@ -982,9 +1265,9 @@ export default function App() {
                             traitGameScore={traitGameScore}
                             traitGameFeedback={traitGameFeedback}
                             traitQuestions={traitQuestions}
-                            startTraitGame={startTraitGame} // تمرير الدالة
-                            handleTraitAnswer={handleTraitAnswer} // تمرير الدالة
-                            resetTraitGame={resetTraitGame} // تمرير الدالة
+                            startTraitGame={startTraitGame}
+                            handleTraitAnswer={handleTraitAnswer}
+                            resetTraitGame={resetTraitGame}
 
                             // Story Game
                             storyGameStarted={storyGameStarted}
@@ -992,9 +1275,9 @@ export default function App() {
                             storyGameScore={storyGameScore}
                             storyGameFeedback={storyGameFeedback}
                             storyQuestions={storyQuestions}
-                            startStoryGame={startStoryGame} // تمرير الدالة
-                            handleStoryAnswer={handleStoryAnswer} // تمرير الدالة
-                            resetStoryGame={resetStoryGame} // تمرير الدالة
+                            startStoryGame={startStoryGame}
+                            handleStoryAnswer={handleStoryAnswer}
+                            resetStoryGame={resetStoryGame}
 
                             // Memory Game
                             memoryGameStarted={memoryGameStarted}
@@ -1003,12 +1286,12 @@ export default function App() {
                             matchedCards={matchedCards}
                             moves={moves}
                             memoryGameMessage={memoryGameMessage}
-                            handleCardClick={handleCardClick} // تمرير الدالة
-                            startMemoryGame={startMemoryGame} // تمرير الدالة
-                            resetMemoryGame={resetMemoryGame} // تمرير الدالة
+                            handleCardClick={handleCardClick}
+                            startMemoryGame={startMemoryGame}
+                            resetMemoryGame={resetMemoryGame}
 
                             // Dice Roll
-                            handleDiceRoll={handleDiceRoll} // تمرير الدالة
+                            handleDiceRoll={handleDiceRoll}
 
                             // Personality Quiz (new)
                             personalityQuizStarted={personalityQuizStarted}
@@ -1021,8 +1304,8 @@ export default function App() {
                             setPersonalityQuizScores={setPersonalityQuizScores}
                             setPersonalityQuizResult={setPersonalityQuizResult}
                             getPersonalityType={getPersonalityType}
-                            handlePersonalityAnswer={handlePersonalityAnswer} // تمرير الدالة
-                            resetPersonalityQuiz={resetPersonalityQuiz} // تمرير الدالة
+                            handlePersonalityAnswer={handlePersonalityAnswer}
+                            resetPersonalityQuiz={resetPersonalityQuiz}
 
                             // Who Is It? Game (new)
                             whoIsItGameStarted={whoIsItGameStarted}
@@ -1034,9 +1317,9 @@ export default function App() {
                             setCurrentWhoIsItQuestionIndex={setCurrentWhoIsItQuestionIndex}
                             setWhoIsItGameScore={setWhoIsItGameScore}
                             setWhoIsItGameFeedback={setWhoIsItGameFeedback}
-                            startWhoIsItGame={startWhoIsItGame} // تمرير الدالة
-                            handleWhoIsItAnswer={handleWhoIsItAnswer} // تمرير الدالة
-                            resetWhoIsItGame={resetWhoIsItGame} // تمرير الدالة
+                            startWhoIsItGame={startWhoIsItGame}
+                            handleWhoIsItAnswer={handleWhoIsItAnswer}
+                            resetWhoIsItGame={resetWhoIsItGame}
 
                             // Sentence Builder Game (new)
                             sentenceBuilderGameStarted={sentenceBuilderGameStarted}
@@ -1050,9 +1333,9 @@ export default function App() {
                             setUserSentence={setUserSentence}
                             setSentenceGameFeedback={setSentenceGameFeedback}
                             setScoreSentenceGame={setScoreSentenceGame}
-                            startSentenceBuilderGame={startSentenceBuilderGame} // تمرير الدالة
-                            handleSubmitSentence={handleSubmitSentence} // تمرير الدالة
-                            resetSentenceBuilderGame={resetSentenceBuilderGame} // تمرير الدالة
+                            startSentenceBuilderGame={startSentenceBuilderGame}
+                            handleSubmitSentence={handleSubmitSentence}
+                            resetSentenceBuilderGame={resetSentenceBuilderGame}
 
                             // Missing Name Game (new)
                             missingNameGameStarted={missingNameGameStarted}
@@ -1066,9 +1349,9 @@ export default function App() {
                             setUserMissingNameGuess={setUserMissingNameGuess}
                             setMissingNameFeedback={setMissingNameFeedback}
                             setScoreMissingNameGame={setScoreMissingNameGame}
-                            startMissingNameGame={startMissingNameGame} // تمرير الدالة
-                            handleSubmitMissingName={handleSubmitMissingName} // تمرير الدالة
-                            resetMissingNameGame={resetMissingNameGame} // تمرير الدالة
+                            startMissingNameGame={startMissingNameGame}
+                            handleSubmitMissingName={handleSubmitMissingName}
+                            resetMissingNameGame={resetMissingNameGame}
 
                             // Categorization Game (new)
                             categorizationGameStarted={categorizationGameStarted}
@@ -1080,9 +1363,9 @@ export default function App() {
                             setCurrentCategorizationQuestionIndex={setCurrentCategorizationQuestionIndex}
                             setCategorizationGameScore={setCategorizationGameScore}
                             setCategorizationGameFeedback={setCategorizationGameFeedback}
-                            startCategorizationGame={startCategorizationGame} // تمرير الدالة
-                            handleCategorizationAnswer={handleCategorizationAnswer} // تمرير الدالة
-                            resetCategorizationGame={resetCategorizationGame} // تمرير الدالة
+                            startCategorizationGame={startCategorizationGame}
+                            handleCategorizationAnswer={handleCategorizationAnswer}
+                            resetCategorizationGame={resetCategorizationGame}
 
                             showTemporaryMessage={showTemporaryMessage}
                         />
@@ -1101,13 +1384,14 @@ export default function App() {
 
                     {activeTab === 'recommendation' && (
                         <RecommendationTab
-                            sortedComparisonData={sortedComparisonData} // تمرير sortedComparisonData
+                            sortedComparisonData={sortedComparisonData}
                             showRecommendation={showRecommendation}
                             setShowRecommendation={setShowRecommendation}
                             nameDetails={nameDetails}
                             generatedBlessing={generatedBlessing}
                             loadingBlessing={loadingBlessing}
                             handleGenerateBlessing={handleGenerateBlessing}
+                            showTemporaryMessage={showTemporaryMessage}
                         />
                     )}
 
@@ -1147,8 +1431,9 @@ export default function App() {
                             setImpactScores={setImpactScores}
                             setImpactTestResult={setImpactTestResult}
                             showTemporaryMessage={showTemporaryMessage}
-                            handleImpactAnswer={handleImpactAnswer} // تمرير الدالة
-                            resetImpactTest={resetImpactTest} // تمرير الدالة
+                            handleImpactAnswer={handleImpactAnswer}
+                            resetImpactTest={resetImpactTest}
+                            getImpactResult={getImpactResult}
                         />
                     )}
                 </main>
@@ -1172,6 +1457,8 @@ export default function App() {
                     </button>
                 </footer>
             </div>
+            {/* يُفترض أن Tailwind CSS CDN متاح أو يتم إدارته بواسطة بيئة التضمين.
+                لـ HTML المستقل، سيكون هذا في <head>. */}
             <script src="https://cdn.tailwindcss.com"></script>
         </div>
     );
