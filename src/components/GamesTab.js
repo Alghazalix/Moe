@@ -1,10 +1,11 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React from 'react';
 
-// هذا هو مكون GamesTab.js
-// يرجى حفظ هذا الكود في ملف جديد باسم GamesTab.js في نفس مجلد App.js
+// هذا هو مكون GamesTab.js المحدث
+// يرجى حفظ هذا الكود في ملف جديد باسم GamesTab.js في مجلد src/components
 
 const GamesTab = ({
     nameKeys,
+    // Ideal Name Quiz
     quizStarted,
     currentQuizQuestionIndex,
     quizQuestions,
@@ -12,6 +13,7 @@ const GamesTab = ({
     quizResult,
     startQuiz,
     resetQuiz,
+    // Name-Trait Matching Game
     traitGameStarted,
     currentTraitIndex,
     traitGameScore,
@@ -20,6 +22,7 @@ const GamesTab = ({
     startTraitGame,
     handleTraitAnswer,
     resetTraitGame,
+    // Name Story Completion Game
     storyGameStarted,
     currentStoryIndex,
     storyGameScore,
@@ -28,6 +31,7 @@ const GamesTab = ({
     startStoryGame,
     handleStoryAnswer,
     resetStoryGame,
+    // Name Memory Challenge
     memoryGameStarted,
     memoryCards,
     flippedCards,
@@ -37,17 +41,22 @@ const GamesTab = ({
     handleCardClick,
     startMemoryGame,
     resetMemoryGame,
+    // Dice Roll
     handleDiceRoll,
+    // Personality Quiz by Names
     personalityQuizStarted,
     currentPersonalityQuestionIndex,
     personalityQuestions,
     personalityQuizScores,
     personalityQuizResult,
-    setPersonalityQuizScores,
-    setPersonalityQuizResult,
-    setPersonalityQuizStarted,
-    setCurrentPersonalityQuestionIndex,
-    getPersonalityType,
+    setPersonalityQuizScores, // This state setter is passed for direct updates from App.js if needed, but the handler logic is in App.js
+    setPersonalityQuizResult, // This state setter is passed for direct updates from App.js if needed, but the handler logic is in App.js
+    setPersonalityQuizStarted, // This state setter is passed for direct updates from App.js if needed, but the handler logic is in App.js
+    setCurrentPersonalityQuestionIndex, // This state setter is passed for direct updates from App.js if needed, but the handler logic is in App.js
+    getPersonalityType, // This helper function is passed from App.js
+    handlePersonalityAnswer, // This handler is passed from App.js
+    resetPersonalityQuiz, // This handler is passed from App.js
+    // Who Is It? Game
     whoIsItGameStarted,
     currentWhoIsItQuestionIndex,
     whoIsItGameScore,
@@ -57,6 +66,10 @@ const GamesTab = ({
     setCurrentWhoIsItQuestionIndex,
     setWhoIsItGameScore,
     setWhoIsItGameFeedback,
+    startWhoIsItGame, // This handler is passed from App.js
+    handleWhoIsItAnswer, // This handler is passed from App.js
+    resetWhoIsItGame, // This handler is passed from App.js
+    // Sentence Builder Game
     sentenceBuilderGameStarted,
     currentSentenceName,
     userSentence,
@@ -68,6 +81,10 @@ const GamesTab = ({
     setUserSentence,
     setSentenceGameFeedback,
     setScoreSentenceGame,
+    startSentenceBuilderGame, // This handler is passed from App.js
+    handleSubmitSentence, // This handler is passed from App.js
+    resetSentenceBuilderGame, // This handler is passed from App.js
+    // Missing Name Game
     missingNameGameStarted,
     currentMissingNamePuzzle,
     userMissingNameGuess,
@@ -79,6 +96,10 @@ const GamesTab = ({
     setUserMissingNameGuess,
     setMissingNameFeedback,
     setScoreMissingNameGame,
+    startMissingNameGame, // This handler is passed from App.js
+    handleSubmitMissingName, // This handler is passed from App.js
+    resetMissingNameGame, // This handler is passed from App.js
+    // Categorization Game
     categorizationGameStarted,
     currentCategorizationQuestionIndex,
     categorizationGameScore,
@@ -88,212 +109,15 @@ const GamesTab = ({
     setCurrentCategorizationQuestionIndex,
     setCategorizationGameScore,
     setCategorizationGameFeedback,
-    showTemporaryMessage,
+    startCategorizationGame, // This handler is passed from App.js
+    handleCategorizationAnswer, // This handler is passed from App.js
+    resetCategorizationGame, // This handler is passed from App.js
+    showTemporaryMessage, // This common utility function is passed from App.js
 }) => {
-
-    // --- Helper for Personality Quiz ---
-    const handlePersonalityAnswer = (scores) => {
-        setPersonalityQuizScores(prevScores => {
-            const newScores = { ...prevScores };
-            for (const type in scores) {
-                newScores[type] = (newScores[type] || 0) + scores[type];
-            }
-            return newScores;
-        });
-
-        if (currentPersonalityQuestionIndex < personalityQuestions.length - 1) {
-            setCurrentPersonalityQuestionIndex(prev => prev + 1);
-        } else {
-            // Quiz finished, determine the personality type
-            let maxScore = -1;
-            let resultTypes = [];
-            const finalScores = { ...personalityQuizScores };
-            for (const type in scores) { // Add scores from the last question
-                finalScores[type] = (finalScores[type] || 0) + scores[type];
-            }
-
-            for (const type in finalScores) {
-                if (finalScores[type] > maxScore) {
-                    maxScore = finalScores[type];
-                    resultTypes = [type];
-                } else if (finalScores[type] === maxScore) {
-                    resultTypes.push(type);
-                }
-            }
-            setPersonalityQuizResult(getPersonalityType(finalScores)); // Use finalScores here
-        }
-    };
-
-    const resetPersonalityQuiz = () => {
-        setPersonalityQuizStarted(false);
-        setCurrentPersonalityQuestionIndex(0);
-        setPersonalityQuizScores({
-            'يامن': 0, 'غوث': 0, 'غياث': 0, 'مستكشف': 0, 'مبدع': 0, 'قيادي': 0, 'متعاون': 0
-        });
-        setPersonalityQuizResult(null);
-    };
-
-    // --- Helper for "Who Is It?" Game ---
-    const startWhoIsItGame = () => {
-        setWhoIsItGameStarted(true);
-        setCurrentWhoIsItQuestionIndex(0);
-        setWhoIsItGameScore(0);
-        setWhoIsItGameFeedback('');
-    };
-
-    const handleWhoIsItAnswer = (selectedOption) => {
-        const currentQ = whoIsItQuestions[currentWhoIsItQuestionIndex];
-        if (selectedOption === currentQ.correctAnswer) {
-            setWhoIsItGameScore(prev => prev + 1);
-            setWhoIsItGameFeedback('إجابة صحيحة! 🎉');
-        } else {
-            setWhoIsItGameFeedback(`إجابة خاطئة. الصحيح هو: ${currentQ.correctAnswer} 😔`);
-        }
-
-        setTimeout(() => {
-            setWhoIsItGameFeedback('');
-            if (currentWhoIsItQuestionIndex < whoIsItQuestions.length - 1) {
-                setCurrentWhoIsItQuestionIndex(prev => prev + 1);
-            } else {
-                setWhoIsItGameStarted(false); // Game over
-                showTemporaryMessage(`انتهت لعبة "من صاحب هذا الاسم؟" نتيجتك: ${whoIsItGameScore + (selectedOption === currentQ.correctAnswer ? 1 : 0)} من ${whoIsItQuestions.length}`, 'info', 5000);
-            }
-        }, 1500);
-    };
-
-    const resetWhoIsItGame = () => {
-        setWhoIsItGameStarted(false);
-        setCurrentWhoIsItQuestionIndex(0);
-        setWhoIsItGameScore(0);
-        setWhoIsItGameFeedback('');
-    };
-
-    // --- Helper for Sentence Builder Game ---
-    const startSentenceBuilderGame = () => {
-        setSentenceBuilderGameStarted(true);
-        const randomName = namesForSentenceGame[Math.floor(Math.random() * namesForSentenceGame.length)];
-        setCurrentSentenceName(randomName);
-        setUserSentence('');
-        setSentenceGameFeedback('');
-        setScoreSentenceGame(0); // Reset score for new game
-    };
-
-    const handleSubmitSentence = () => {
-        if (!userSentence.trim().includes(currentSentenceName)) {
-            setSentenceGameFeedback(`يجب أن تتضمن الجملة اسم "${currentSentenceName}". 😔`);
-            showTemporaryMessage(`الجملة يجب أن تتضمن اسم "${currentSentenceName}".`, 'error', 3000);
-            return;
-        }
-
-        const sentenceLength = userSentence.trim().split(' ').length;
-        if (sentenceLength >= 5) {
-            setScoreSentenceGame(prev => prev + 1);
-            setSentenceGameFeedback('جملة رائعة! 🎉');
-            showTemporaryMessage('جملة رائعة! أحسنت.', 'success', 3000);
-        } else {
-            setSentenceGameFeedback('جملة قصيرة. حاول أن تكون أكثر إبداعاً (على الأقل 5 كلمات). 💡');
-            showTemporaryMessage('جملة قصيرة. حاول أن تكون أكثر إبداعاً (على الأقل 5 كلمات).', 'info', 4000);
-        }
-
-        setTimeout(() => {
-            setSentenceGameFeedback('');
-            setUserSentence('');
-            const remainingNames = namesForSentenceGame.filter(name => name !== currentSentenceName);
-            if (remainingNames.length > 0) {
-                const nextName = remainingNames[Math.floor(Math.random() * remainingNames.length)];
-                setCurrentSentenceName(nextName);
-            } else {
-                setSentenceBuilderGameStarted(false); // All names used
-                showTemporaryMessage(`انتهت اللعبة! أحرزت ${scoreSentenceGame + (sentenceLength >= 5 ? 1 : 0)} نقطة.`, 'info', 5000);
-            }
-        }, 2000);
-    };
-
-    const resetSentenceBuilderGame = () => {
-        setSentenceBuilderGameStarted(false);
-        setCurrentSentenceName('');
-        setUserSentence('');
-        setSentenceGameFeedback('');
-        setScoreSentenceGame(0);
-    };
-
-    // --- Helper for Missing Name Game ---
-    const startMissingNameGame = () => {
-        setMissingNameGameStarted(true);
-        setCurrentMissingNamePuzzle(0);
-        setUserMissingNameGuess('');
-        setMissingNameFeedback('');
-        setScoreMissingNameGame(0);
-    };
-
-    const handleSubmitMissingName = () => {
-        const currentPuzzle = missingNamePuzzles[currentMissingNamePuzzle];
-        if (userMissingNameGuess.trim() === currentPuzzle.answer) {
-            setScoreMissingNameGame(prev => prev + 1);
-            setMissingNameFeedback('صحيح! 🎉');
-            showTemporaryMessage('إجابة صحيحة!', 'success', 2000);
-        } else {
-            setMissingNameFeedback(`خطأ. تلميح: ${currentPuzzle.hint} 😔`);
-            showTemporaryMessage(`إجابة خاطئة. تلميح: ${currentPuzzle.hint}`, 'error', 3000);
-        }
-
-        setTimeout(() => {
-            setMissingNameFeedback('');
-            setUserMissingNameGuess('');
-            if (currentMissingNamePuzzle < missingNamePuzzles.length - 1) {
-                setCurrentMissingNamePuzzle(prev => prev + 1);
-            } else {
-                setMissingNameGameStarted(false); // Game over
-                showTemporaryMessage(`انتهت اللعبة! أحرزت ${scoreMissingNameGame + (userMissingNameGuess.trim() === currentPuzzle.answer ? 1 : 0)} نقطة.`, 'info', 5000);
-            }
-        }, 1500);
-    };
-
-    const resetMissingNameGame = () => {
-        setMissingNameGameStarted(false);
-        setCurrentMissingNamePuzzle(0);
-        setUserMissingNameGuess('');
-        setMissingNameFeedback('');
-        setScoreMissingNameGame(0);
-    };
-
-    // --- Helper for Categorization Game ---
-    const startCategorizationGame = () => {
-        setCategorizationGameStarted(true);
-        setCurrentCategorizationQuestionIndex(0);
-        setCategorizationGameScore(0);
-        setCategorizationGameFeedback('');
-    };
-
-    const handleCategorizationAnswer = (selectedCategory) => {
-        const currentQ = nameCategorizationQuestions[currentCategorizationQuestionIndex];
-        if (selectedCategory === currentQ.correctCategory) {
-            setCategorizationGameScore(prev => prev + 1);
-            setCategorizationGameFeedback('إجابة صحيحة! 🎉');
-            showTemporaryMessage('صحيح! أحسنت.', 'success', 2000);
-        } else {
-            setCategorizationGameFeedback(`إجابة خاطئة. الصحيح هو: "${currentQ.correctCategory}" 😔`);
-            showTemporaryMessage(`إجابة خاطئة. الصحيح هو: "${currentQ.correctCategory}"`, 'error', 3000);
-        }
-
-        setTimeout(() => {
-            setCategorizationGameFeedback('');
-            if (currentCategorizationQuestionIndex < nameCategorizationQuestions.length - 1) {
-                setCurrentCategorizationQuestionIndex(prev => prev + 1);
-            } else {
-                setCategorizationGameStarted(false); // Game over
-                showTemporaryMessage(`انتهت اللعبة! أحرزت ${categorizationGameScore + (selectedCategory === currentQ.correctCategory ? 1 : 0)} نقطة.`, 'info', 5000);
-            }
-        }, 1500);
-    };
-
-    const resetCategorizationGame = () => {
-        setCategorizationGameStarted(false);
-        setCurrentCategorizationQuestionIndex(0);
-        setCategorizationGameScore(0);
-        setCategorizationGameFeedback('');
-    };
-
+    // All game logic handlers are now passed as props from App.js
+    // No need to define them here.
+    // The previous implementation had some of these defined here, which was causing the 'no-undef' errors
+    // when they were removed from App.js's scope or not properly passed down.
 
     return (
         <section className="animate-fadeIn">
@@ -514,7 +338,7 @@ const GamesTab = ({
                                     {memoryGameMessage}
                                 </p>
                             )}
-                            {matchedCards.length === memoryCards.length && (
+                            {matchedCards.length === memoryCards.length / 2 && ( // Changed from memoryCards.length to memoryCards.length / 2
                                 <button
                                     onClick={resetMemoryGame}
                                     className="mt-6 bg-purple-500 text-white py-2 px-5 rounded-full hover:bg-purple-600 transition-colors shadow-md"
@@ -674,7 +498,7 @@ const GamesTab = ({
                                     {sentenceGameFeedback}
                                 </p>
                             )}
-                            {(!currentSentenceName && sentenceBuilderGameStarted) && (
+                            {(!currentSentenceName && !sentenceBuilderGameStarted) && ( // Adjusted condition
                                 <div className="mt-6 bg-green-50 p-4 rounded-lg border border-green-300">
                                     <h5 className="text-xl font-bold text-green-700 mb-2">انتهت اللعبة!</h5>
                                     <p className="text-lg text-gray-800">أحرزت: <span className="font-bold text-2xl">{scoreSentenceGame}</span> نقطة</p>
