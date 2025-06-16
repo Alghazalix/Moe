@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-// هذا هو مكون GemsTab.js
+// هذا هو مكون GemsTab.js المحدث
 // يرجى حفظ هذا الكود في ملف جديد باسم GemsTab.js في مجلد src/components
 
 const GemsTab = ({
@@ -13,14 +13,17 @@ const GemsTab = ({
     setHistoricalNameFact,
     personalityImpactTestStarted,
     currentImpactQuestionIndex,
-    personalityImpactQuestions,
-    impactScores,
-    impactTestResult,
+    personalityImpactQuestions, // يجب تمريرها
+    impactScores, // يجب تمريرها
+    impactTestResult, // يجب تمريرها
     setPersonalityImpactTestStarted,
     setCurrentImpactQuestionIndex,
     setImpactScores,
     setImpactTestResult,
-    showTemporaryMessage,
+    showTemporaryMessage, // يجب تمريرها
+    handleImpactAnswer, // يجب تمريرها
+    resetImpactTest, // يجب تمريرها
+    getImpactResult // يجب تمريرها
 }) => {
     // دالة مساعدة لجلب معلومات الاسم التاريخية
     const getHistoricalNameFact = (name) => {
@@ -35,55 +38,9 @@ const GemsTab = ({
         return "لا توجد معلومات تاريخية مفصلة لهذا الاسم في قاعدتنا الحالية.";
     };
 
-    // دالة مساعدة لتحديد مدى تأثير الاسم على الشخصية بناءً على الدرجات
-    const getImpactResult = (scores) => {
-        let maxScore = -1;
-        let dominantTrait = 'متوازن';
-        for (const trait in scores) {
-            if (scores[trait] > maxScore) {
-                maxScore = scores[trait];
-                dominantTrait = trait;
-            }
-        }
-        if (maxScore <= 0) return "اسمك له تأثير متوازن أو ليس له تأثير واضح على هذه الجوانب من شخصيتك في هذا الاختبار.";
-
-        switch (dominantTrait) {
-            case 'confidence': return "يبدو أن اسمك يعزز لديك شعوراً كبيراً بالثقة والفخر.";
-            case 'leadership': return "يشير اختبارك إلى أن اسمك قد يبرز لديك سمات قيادية قوية.";
-            case 'empathy': return "اسمك قد يعكس ويقوي لديك سمات التعاطف والتفهم مع الآخرين.";
-            case 'positiveOutlook': return "يبدو أن اسمك مرتبط بنظرة إيجابية وتفاؤلية للحياة.";
-            default: return "اسمك له تأثير متوازن أو ليس له تأثير واضح على هذه الجوانب من شخصيتك في هذا الاختبار.";
-        }
-    };
-
-    // معالج لأسئلة اختبار تأثير الاسم
-    const handleImpactAnswer = (scores) => {
-        setImpactScores(prevScores => {
-            const newScores = { ...prevScores };
-            for (const trait in scores) {
-                newScores[trait] = (newScores[trait] || 0) + scores[trait];
-            }
-            return newScores;
-        });
-
-        if (currentImpactQuestionIndex < personalityImpactQuestions.length - 1) {
-            setCurrentImpactQuestionIndex(prev => prev + 1);
-        } else {
-            // Quiz finished, determine the result
-            const finalScores = { ...impactScores };
-            for (const trait in scores) { // Add scores from the last question
-                finalScores[trait] = (finalScores[trait] || 0) + scores[trait];
-            }
-            setImpactTestResult(getImpactResult(finalScores));
-        }
-    };
-
-    const resetImpactTest = () => {
-        setPersonalityImpactTestStarted(false);
-        setCurrentImpactQuestionIndex(0);
-        setImpactScores({});
-        setImpactTestResult(null);
-    };
+    // دوال getImpactResult, handleImpactAnswer, resetImpactTest
+    // تم نقلها إلى App.js ويتم تمريرها الآن كمفاتيح (props).
+    // لذلك، لا داعي لتعريفها هنا مرة أخرى.
 
     return (
         <section className="animate-fadeIn">
