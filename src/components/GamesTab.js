@@ -42,20 +42,20 @@ const GamesTab = ({
     startMemoryGame,
     resetMemoryGame,
     // Dice Roll
-    handleDiceRoll,
+    handleDiceRoll, // <--- تأكدنا من وجودها هنا
     // Personality Quiz by Names
     personalityQuizStarted,
     currentPersonalityQuestionIndex,
     personalityQuestions,
     personalityQuizScores,
     personalityQuizResult,
-    setPersonalityQuizScores, // This state setter is passed for direct updates from App.js if needed, but the handler logic is in App.js
-    setPersonalityQuizResult, // This state setter is passed for direct updates from App.js if needed, but the handler logic is in App.js
-    setPersonalityQuizStarted, // This state setter is passed for direct updates from App.js if needed, but the handler logic is in App.js
-    setCurrentPersonalityQuestionIndex, // This state setter is passed for direct updates from App.js if needed, but the handler logic is in App.js
-    getPersonalityType, // This helper function is passed from App.js
-    handlePersonalityAnswer, // This handler is passed from App.js
-    resetPersonalityQuiz, // This handler is passed from App.js
+    setPersonalityQuizScores,
+    setPersonalityQuizResult,
+    setPersonalityQuizStarted,
+    setCurrentPersonalityQuestionIndex,
+    getPersonalityType,
+    handlePersonalityAnswer,
+    resetPersonalityQuiz,
     // Who Is It? Game
     whoIsItGameStarted,
     currentWhoIsItQuestionIndex,
@@ -66,9 +66,9 @@ const GamesTab = ({
     setCurrentWhoIsItQuestionIndex,
     setWhoIsItGameScore,
     setWhoIsItGameFeedback,
-    startWhoIsItGame, // This handler is passed from App.js
-    handleWhoIsItAnswer, // This handler is passed from App.js
-    resetWhoIsItGame, // This handler is passed from App.js
+    startWhoIsItGame,
+    handleWhoIsItAnswer,
+    resetWhoIsItGame,
     // Sentence Builder Game
     sentenceBuilderGameStarted,
     currentSentenceName,
@@ -81,9 +81,9 @@ const GamesTab = ({
     setUserSentence,
     setSentenceGameFeedback,
     setScoreSentenceGame,
-    startSentenceBuilderGame, // This handler is passed from App.js
-    handleSubmitSentence, // This handler is passed from App.js
-    resetSentenceBuilderGame, // This handler is passed from App.js
+    startSentenceBuilderGame,
+    handleSubmitSentence,
+    resetSentenceBuilderGame,
     // Missing Name Game
     missingNameGameStarted,
     currentMissingNamePuzzle,
@@ -96,9 +96,9 @@ const GamesTab = ({
     setUserMissingNameGuess,
     setMissingNameFeedback,
     setScoreMissingNameGame,
-    startMissingNameGame, // This handler is passed from App.js
-    handleSubmitMissingName, // This handler is passed from App.js
-    resetMissingNameGame, // This handler is passed from App.js
+    startMissingNameGame,
+    handleSubmitMissingName,
+    resetMissingNameGame,
     // Categorization Game
     categorizationGameStarted,
     currentCategorizationQuestionIndex,
@@ -109,16 +109,11 @@ const GamesTab = ({
     setCurrentCategorizationQuestionIndex,
     setCategorizationGameScore,
     setCategorizationGameFeedback,
-    startCategorizationGame, // This handler is passed from App.js
-    handleCategorizationAnswer, // This handler is passed from App.js
-    resetCategorizationGame, // This handler is passed from App.js
-    showTemporaryMessage, // This common utility function is passed from App.js
+    startCategorizationGame,
+    handleCategorizationAnswer,
+    resetCategorizationGame,
+    showTemporaryMessage,
 }) => {
-    // All game logic handlers are now passed as props from App.js
-    // No need to define them here.
-    // The previous implementation had some of these defined here, which was causing the 'no-undef' errors
-    // when they were removed from App.js's scope or not properly passed down.
-
     return (
         <section className="animate-fadeIn">
             <h2 className="text-3xl font-bold text-center text-indigo-700 mb-8 border-b-2 border-indigo-400 pb-4 font-cairo-display">
@@ -338,7 +333,7 @@ const GamesTab = ({
                                     {memoryGameMessage}
                                 </p>
                             )}
-                            {matchedCards.length === memoryCards.length / 2 && ( // Changed from memoryCards.length to memoryCards.length / 2
+                            {matchedCards.length === memoryCards.length / 2 && (
                                 <button
                                     onClick={resetMemoryGame}
                                     className="mt-6 bg-purple-500 text-white py-2 px-5 rounded-full hover:bg-purple-600 transition-colors shadow-md"
